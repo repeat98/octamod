@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 2,
+  "id": "inflator",
+  "key": "INFLATOR",
+  "name": "Inflator",
+  "version": "0.1.0-experimental",
+  "category": "effects",
+  "author": {
+    "github": "devilfish707",
+    "credits": [
+      "devilfish707: Inflator DSP56300 port and Octamod draft",
+      "JClones: OInflator JSFX algorithm (MIT), from jsfxclones",
+      "octabam: Sam Banks; SDK, schema and harness (MIT)"
+    ]
+  },
+  "nativeManifest": "manifest.py",
+  "presentation": {
+    "label": "LOUDNESS",
+    "family": "Saturation",
+    "summary": "An Oxford-style inflator (JClones OInflator) on the DSP: curve-shaped saturation for loudness, with an optional three-band split.",
+    "overview": "Inflator pushes perceived loudness and density without obvious distortion. Its waveshaper g(1 - |g|) lifts mid levels and rounds peaks; EFFECT blends it with the dry signal and CURVE moves it from soft to hard. With SPLIT on, the lows (below 240 Hz), mids and highs (above 2.4 kHz) are shaped separately. CLIP limits the input at 0 dBFS or allows 6 dB more. It is a buffer-free insert for FX1 or FX2 on any track. This is a source draft: it is not in the catalog or the firmware builder.",
+    "highlights": [
+      "Port of JClones OInflator (MIT), within 5.2e-5 of the JSFX in both modes, gain-staged for the Octatrack's FX input level",
+      "INPUT -6 to +12 dB, OUTPUT -12 to 0 dB, CURVE -50 to +50, CLIP and SPLIT as in the JSFX",
+      "Single band: 90 executed instructions per sample, a third of stock SPRING REV",
+      "Band split: about the same as SPRING REV per instance, 15% below it at the worst four-per-core case"
+    ],
+    "usage": [
+      "Assign INFLATOR in FUNC + FX2 (or FX1) SETUP with LEVEL and YES. It starts at the JSFX defaults, with EFFECT at 0: dry.",
+      "Turn EFFECT up to inflate; CURVE below 0 is softer, above 0 harder. Use OUT to match the level.",
+      "Turn SPLIT on to treat lows, mids and highs separately, which keeps the bass from driving the top end."
+    ]
+  },
+  "controls": [
+    {
+      "name": "INPUT",
+      "default": 42,
+      "count": 128,
+      "doc": "Input level, -6 dB at 0 to +12 dB at 126 (+12.1 dB at 127) in 1/7 dB steps; 42 is 0 dB, the JSFX default.",
+      "labels": null
+    },
+    {
+      "name": "EFFCT",
+      "default": 0,
+      "count": 128,
+      "doc": "Effect amount: 0 is dry (the JSFX default), 127 is 100%.",
+      "labels": null
+    },
+    {
+      "name": "CURVE",
+      "default": 64,
+      "count": 128,
+      "doc": "Curve, drawn -64 to +63 for the JSFX's -50 to +49: below 0 softer, above 0 harder. 0 is the JSFX default.",
+      "labels": null
+    },
+    {
+      "name": "CLIP",
+      "default": 1,
+      "count": 2,
+      "doc": "Clip the input at 0 dBFS (ON, the JSFX default) or at +6 dBFS (OFF).",
+      "labels": [
+        "OFF",
+        "ON"
+      ]
+    },
+    {
+      "name": "SPLIT",
+      "default": 0,
+      "count": 2,
+      "doc": "Band split: shape below 240 Hz, 240 Hz to 2.4 kHz and above 2.4 kHz separately.",
+      "labels": [
+        "OFF",
+        "ON"
+      ]
+    },
+    {
+      "name": "OUT",
+      "default": 127,
+      "count": 128,
+      "doc": "Output level, -12 dB at 0 to 0 dB at 127 (the JSFX default).",
+      "labels": null
+    }
+  ],
+  "compatibility": {
+    "firmware": "1.40C",
+    "effectId": 27,
+    "location": "FX1 / FX2",
+    "conflicts": [],
+    "limitations": [
+      "Draft only: not in the catalog, configurator or firmware builder until hardware qualification and owner review are complete.",
+      "The JSFX defaults leave EFFECT at 0, which is dry: turn it up to hear the effect.",
+      "With CLIP off, or the band split at full drive, the output can exceed full scale; the DSP's output store limits it. Pull OUT down.",
+      "The band-split corners assume 44.1 kHz.",
+      "Effect ID 0x1b, priority 19 and layout letter 8 were checked free against the eleven Octamod modules and the TapeHead and IronOxide5 drafts only.",
+      "Not flashed yet."
+    ]
+  },
+  "resources": {
+    "recorded": "2 Oct 2026, static, emulator and benchmark.py",
+    "storage": {
+      "label": "DSP program",
+      "display": "576 words P, 43 words X per instance, no buffer",
+      "value": 576,
+      "unit": "words",
+      "method": "static",
+      "conditions": "Composed build report (both payloads place 576 words in the donor region). States, constant tables and staging use 43 words of the instance's own r7 block; no allocator buffer, no Y memory. SPRING REV: 1,063 words plus the 16,384-word FX2 instance buffer.",
+      "source": "TESTING.md"
+    },
+    "processing": {
+      "label": "DSP estimate",
+      "display": "89 / 258 cycles/sample (single / split)",
+      "value": 258,
+      "unit": "cycles/sample",
+      "method": "static",
+      "conditions": "tools/build/cycle_count.py static count; the worse of its two mode loops is band split. benchmark.py, executed instructions per sample for one instance: 90 single band, 259 band split (SPRING REV 262); four per core worst 17,272 per 16-sample block (SPRING REV 20,376). Not a hardware load figure.",
+      "source": "TESTING.md"
+    },
+    "impact": {
+      "conditions": "One active instance; SPLIT on is the dearer mode and is rated. Single band costs about a third of it.",
+      "cpu": {
+        "level": "minimal",
+        "basis": "source-estimate",
+        "rationale": "No ColdFire code: a DSP insert with a cloned menu descriptor and two label formatters. The ColdFire only forwards six page-1 values.",
+        "source": "TESTING.md"
+      },
+      "dsp": {
+        "level": "moderate",
+        "basis": "source-estimate",
+        "rationale": "Band split: 258 cycles/sample by the static counter, about 8% of the 3,120 cycles/core usable by modules, and about the same executed instructions as stock SPRING REV per instance (benchmark.py). Single band is 89 cycles/sample.",
+        "source": "TESTING.md"
+      },
+      "memory": {
+        "level": "low",
+        "basis": "source-estimate",
+        "rationale": "576 words of DSP program per payload and 43 words in each instance's existing r7 block. No allocator buffer or Y memory, where SPRING REV takes 1,063 words and a 16,384-word instance buffer.",
+        "source": "TESTING.md"
+      }
+    }
+  },
+  "tests": {
+    "report": "TESTING.md",
+    "summary": "verify.py renders the assembled module in dsp_host against JClones_OInflator.jsfx: peak error 5.2e-5 over eleven settings (both modes, clip on and off, extremes) x eight signals at two input levels, the JSFX's THD at the unit's level within 1 dB (gain-staged JSFX(4x)/4 for the Octatrack's FX input level), exact silence, an EFFECT 0 passthrough within 4 LSB, clip, stereo independence and split blocks. The composed test image renders within 4.8e-7 at the defaults. Benchmarked against stock SPRING REV. Menu, label, init-register and replace gates pass; MKII emulator LCD captures included. OCTABAM9 was played on the author's MKII for about two minutes on four tracks with p-locks and scenes and reported sounding great (a listening test, not a stress run).",
+    "hardwareStatus": "untested",
+    "evidenceRevision": "433fa32c0f5b381cf5a71930dc45e121609b7f4d",
+    "gates": [
+      "verify.py",
+      "benchmark.py",
+      "Worst-case cycles under parameter modulation on hardware",
+      "Real hardware stress project: eight audio tracks, at least 60 minutes"
+    ]
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE",
+    "declaration": "The Inflator port, manifest, generators, gate and documentation are MIT. The algorithm is JClones' OInflator JSFX, MIT, whose notice is in LICENSE and ../../octabam/licenses/jsfxclones.txt. RCInflator 2, which octabam's own inflator ported, carries no licence and is not used. The thumbnail is original and MIT. Emulator LCD captures are LicenseRef-OT-UI-Documentation (media/LICENSE.md). No firmware, extracted routines, tables or generated images are included."
+  },
+  "media": [
+    {
+      "path": "media/ot-location.png",
+      "captureType": "emulator",
+      "caption": "INFLATOR assigned in FX2 SETUP, in the row SPRING REV has on a stock unit. It has no SETUP controls.",
+      "alt": "INFLATOR assigned in FX2 SETUP, in the row SPRING REV has on a stock unit. It has no SETUP controls.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 SETUP",
+        "shows": "location",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "bb6c9cfd3fa7899bcbe9c3c91b8b26c2a8162351818e0fbf87d1202e7180c321",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the inflator-spring remix: stock effects, INFLATOR in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    },
+    {
+      "path": "media/ot-controls.png",
+      "captureType": "emulator",
+      "caption": "INFLATOR on the main FX2 page: INPUT, EFFCT and CURVE on top, CLIP, SPLIT and OUT below, at the JSFX defaults.",
+      "alt": "INFLATOR on the main FX2 page: INPUT, EFFCT and CURVE on top, CLIP, SPLIT and OUT below, at the JSFX defaults.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 main",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "bb6c9cfd3fa7899bcbe9c3c91b8b26c2a8162351818e0fbf87d1202e7180c321",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the inflator-spring remix: stock effects, INFLATOR in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    },
+    {
+      "path": "media/ot-split.png",
+      "captureType": "emulator",
+      "caption": "EFFCT turned to 90 and SPLIT switched ON: the selects print their words.",
+      "alt": "EFFCT turned to 90 and SPLIT switched ON: the selects print their words.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 main, EFFCT 90, SPLIT ON",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "bb6c9cfd3fa7899bcbe9c3c91b8b26c2a8162351818e0fbf87d1202e7180c321",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the inflator-spring remix: stock effects, INFLATOR in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    }
+  ],
+  "access": {
+    "location": "FUNC + FX1 or FUNC + FX2 SETUP on an audio track: the effect chooser (LEVEL selects, YES assigns). The six controls are on the FX main page.",
+    "steps": [
+      "Select an audio track that plays a sample.",
+      "Hold FUNC and press FX2 (or FX1) to open its SETUP. Turn LEVEL to INFLATOR and press YES to assign it.",
+      "Press FX2 (or FX1) to show the main page: INPUT, EFFCT, CURVE on the top row, CLIP, SPLIT and OUT below. The SETUP page has no Inflator controls.",
+      "Verified on the MKII panel of the emulator with the hardware test image; not yet on a unit."
+    ],
+    "screenshots": [
+      "media/ot-location.png",
+      "media/ot-controls.png",
+      "media/ot-split.png"
+    ]
+  }
+}

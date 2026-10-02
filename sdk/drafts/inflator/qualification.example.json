@@ -1,0 +1,96 @@
+{
+  "moduleVersion": "0.1.0-experimental",
+  "sourceSha256": "fcd96fe92447ff7fe4da7c19a34d28941dc2674d3eb07d80ecab87cdd8521662",
+  "imageSha256": "REPLACE_WITH_LOCAL_TESTED_IMAGE_SHA256",
+  "cycles": [
+    {
+      "processor": "dsp",
+      "worstCase": 258,
+      "maxConfiguration": 2064,
+      "maxInstances": 8,
+      "budget": 3120,
+      "unit": "cycles/sample",
+      "method": "static",
+      "conditions": {
+        "parameterExtremes": "Static count, worst of the two mode loops (band split); no branch inside either loop. verify.py renders every knob at 0 and 127 in both modes, clip on and off. Hardware: pending.",
+        "parameterModulation": "Pending on hardware. Knobs are read once per block; benchmark.py moves every control every block, including SPLIT, worst 17,272 instructions per core per block.",
+        "modeSwitching": "SPLIT switches between two loops per block; split 7/9 calls keep the filter states bit-exact (verify.py). Hardware FX reselection, NONE bypass and Part changes pending.",
+        "maxLoad": "Static: eight band-split instances per core (FX1 and FX2 on four tracks) = 2,064 cycles/sample against 3,120 usable. Not measured on hardware or in a composed image.",
+        "inputConditions": "verify.py: silence, a 0.9 impulse, a 0.5 step, 50 Hz-8 kHz tones and white noise at -2 dBFS, with +12 dB input and clip off. Hardware pending."
+      },
+      "report": "TESTING.md"
+    }
+  ],
+  "memory": {
+    "regions": [
+      {
+        "name": "inflator.asm program (one copy per payload)",
+        "space": "dsp-p",
+        "words": 576,
+        "wordBits": 24,
+        "bytes": 1728,
+        "scope": "shared"
+      },
+      {
+        "name": "r7 states, tables and staging: $00-$10, $18-$22, $28-$2d, $30-$3c",
+        "space": "dsp-x",
+        "words": 43,
+        "wordBits": 24,
+        "bytes": 129,
+        "scope": "instance"
+      }
+    ],
+    "perInstanceBytes": 129,
+    "sharedBytes": 1728,
+    "maxInstances": 16,
+    "totalBytes": 3792,
+    "conditions": "Composed build report for inflator-spring: 576 words in each payload's donor region. The r7 words lie inside the dispatcher's existing 256-word block for the slot. This record counts one payload's program.",
+    "report": "TESTING.md"
+  },
+  "hardware": {
+    "status": "pending",
+    "model": "MKII",
+    "testedOn": "YYYY-MM-DD",
+    "tester": "Your credited tester handle; no email",
+    "project": {
+      "name": "Your local stress project",
+      "sha256": "REPLACE_WITH_PROJECT_FINGERPRINT",
+      "recipe": "Record generator/tool revision and command, local source template fingerprint, sample recipe, all settings and modifications needed to reproduce this stress project. Keep the project/card/firmware local."
+    },
+    "durationMinutes": null,
+    "audioTracks": 8,
+    "midiTracks": null,
+    "conditions": {
+      "parameterExtremes": "Describe every minimum, maximum and branch boundary tested.",
+      "parameterModulation": "Describe simultaneous LFOs, p-locks, MIDI CC and scene sweeps; justify each inapplicable mechanism.",
+      "modeSwitching": "Describe repeated/interrupted mode, bypass and Part changes.",
+      "maxLoad": "Describe maximum voices/instances, both cores, FX slots, streaming and USB/MIDI load.",
+      "inputConditions": "Describe silence, impulses, full-scale inputs, feedback and other worst-case signal conditions."
+    },
+    "checks": {
+      "audioContinuity": "failed",
+      "transport": "failed",
+      "controls": "failed",
+      "memoryIntegrity": "failed",
+      "recovery": "failed"
+    },
+    "report": "TESTING.md",
+    "maxInstances": null
+  },
+  "documentation": {
+    "tutorial": {
+      "title": "Quick tutorial: inflate a mix bus",
+      "steps": [
+        "On a track playing a full loop, hold FUNC and press FX2, turn LEVEL to INFLATOR and press YES. Press FX2 to see INPUT, EFFCT, CURVE, CLIP, SPLIT and OUT at the JSFX defaults: EFFCT 0 is dry.",
+        "Turn EFFCT up to about 90 and the loop gets louder and denser. Turn CURVE left for a softer result or right for a harder one; pull OUT down to match the level.",
+        "Switch SPLIT on to shape lows, mids and highs separately. Turn EFFCT back to 0 to hear the dry track."
+      ]
+    },
+    "screenshots": [
+      "media/ot-location.png",
+      "media/ot-controls.png",
+      "media/ot-split.png"
+    ],
+    "screenshotStyle": "black-and-white"
+  }
+}
