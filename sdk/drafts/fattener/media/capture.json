@@ -1,0 +1,122 @@
+{
+  "firmware": "1.40C",
+  "imageSha256": "9500e5bcee18addae560b539966306533886b319019572bf8977a5c51721f650",
+  "emulatorSha256": "2360ffb244833bc015cdc84ecc36394758bf93952034a8b08a63e1955af85115",
+  "setup": "Headless ot_emu; MKII panel; stopped transport; 128×64 LCD at integer scale 6.",
+  "palette": {
+    "on": [
+      240,
+      240,
+      240
+    ],
+    "off": [
+      24,
+      24,
+      24
+    ]
+  },
+  "keyMs": 150,
+  "plan": [
+    {
+      "wait": 3000
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "wait": 2000
+    },
+    {
+      "press": [
+        "NO"
+      ]
+    },
+    {
+      "press": [
+        "FUNC",
+        "FX2"
+      ]
+    },
+    {
+      "encoder": {
+        "name": "LEVEL",
+        "delta": -20
+      }
+    },
+    {
+      "encoder": {
+        "name": "LEVEL",
+        "delta": 13
+      }
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "capture": "location.png"
+    },
+    {
+      "press": [
+        "FX2"
+      ]
+    },
+    {
+      "capture": "controls.png"
+    },
+    {
+      "encoder": {
+        "name": "A",
+        "delta": 80
+      }
+    },
+    {
+      "encoder": {
+        "name": "B",
+        "delta": 40
+      }
+    },
+    {
+      "capture": "fat-color.png"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "media/ot-location.png",
+      "sha256": "b980aaa4064abc7e39fe1a585e381635e08c5648176d99d0602469f6b50df293"
+    },
+    {
+      "path": "media/ot-controls.png",
+      "sha256": "efb348addbaa43f3b5a965b575d82ee80b1aa604dd9e8f9cc3ea71fa3d029b0c"
+    },
+    {
+      "path": "media/ot-fat-color.png",
+      "sha256": "7fb8baffbdc464795b3dbf9e4ccf55e46092cfc02e0171c55f0526ec2c7c6c95"
+    }
+  ],
+  "moduleId": "fattener",
+  "moduleVersion": "0.1.0-experimental",
+  "captured": "2026-10-02",
+  "imageProfile": {
+    "remix": "fattener-spring (hardware-test-remix.py)",
+    "fxRow": "FATTENER in SPRING REV's position",
+    "staticStock": true
+  },
+  "captureFiles": {
+    "media/ot-location.png": "location.png",
+    "media/ot-controls.png": "controls.png",
+    "media/ot-fat-color.png": "fat-color.png"
+  },
+  "sourceSha256": {
+    "fattener.asm": "73169fb714724ab4db5ac2729488e4f7d181ee1cb003b1ddaabdb64c887ab3df",
+    "manifest.py": "cc415a5b9250d67d33f21a8fa641b4b89bee4514a50ccba0f41d58820147f950"
+  },
+  "limitations": [
+    "Emulator UI evidence only; no hardware, audio or stress qualification.",
+    "Empty scratch card, no samples or projects."
+  ],
+  "note": "Captured on OCTABAM10 and again on OCTABAM11 (the optimised source) with the same plan and ot_emu binary: all three PNGs byte-identical. The image was built before two comment lines in gen_asm.py's header and manifest.py's docstring and proof note changed; its code and P table are identical to the committed files."
+}

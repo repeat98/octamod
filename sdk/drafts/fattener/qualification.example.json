@@ -1,0 +1,96 @@
+{
+  "moduleVersion": "0.1.0-experimental",
+  "sourceSha256": "73169fb714724ab4db5ac2729488e4f7d181ee1cb003b1ddaabdb64c887ab3df",
+  "imageSha256": "REPLACE_WITH_LOCAL_TESTED_IMAGE_SHA256",
+  "cycles": [
+    {
+      "processor": "dsp",
+      "worstCase": 193,
+      "maxConfiguration": 1544,
+      "maxInstances": 8,
+      "budget": 3120,
+      "unit": "cycles/sample",
+      "method": "static",
+      "conditions": {
+        "parameterExtremes": "Static count; the sample routine is straight-line, so every setting costs the same. verify.py renders FAT, COLOR and GAIN at 0 and 127 and between. Hardware: pending.",
+        "parameterModulation": "Pending on hardware (the first build overran there under p-locks and scene moves). FAT and GAIN are read every block; COLOR runs a table interpolation and one division in a block where it changed. verify.py and benchmark.py move every control every block: 203 executed instructions per sample (one instance), worst 13,536 per core per block (four instances).",
+        "modeSwitching": "No modes. A call boundary inside a block keeps every state and starts a new gain ramp, as the model does (verify.py). Hardware FX reselection, NONE bypass and Part changes pending; selection runs init (549 instructions) once.",
+        "maxLoad": "Static: eight instances per core (FX1 and FX2 on four tracks) = 1,544 cycles/sample against 3,120 usable. Not measured on hardware.",
+        "inputConditions": "verify.py: silence (also from a garbage-filled instance block), a 0.8 impulse, a step, 50 Hz-12 kHz tones, a burst and white noise at -2 dBFS and 0.22 FS, and a 60 Hz burst into a second of silence at full gain. Hardware pending."
+      },
+      "report": "TESTING.md"
+    }
+  ],
+  "memory": {
+    "regions": [
+      {
+        "name": "fattener.asm program and its P table (one copy per payload)",
+        "space": "dsp-p",
+        "words": 698,
+        "wordBits": 24,
+        "bytes": 2094,
+        "scope": "shared"
+      },
+      {
+        "name": "r7 states, coefficients, tables and staging: $00-$9f",
+        "space": "dsp-x",
+        "words": 160,
+        "wordBits": 24,
+        "bytes": 480,
+        "scope": "instance"
+      }
+    ],
+    "perInstanceBytes": 480,
+    "sharedBytes": 2094,
+    "maxInstances": 16,
+    "totalBytes": 9774,
+    "conditions": "Composed build report for fattener-spring: a 225-word P table and 473 words of code in each payload's 1,063-word donor region. The r7 words lie inside the dispatcher's existing 256-word block for the slot. This record counts one payload's program.",
+    "report": "TESTING.md"
+  },
+  "hardware": {
+    "status": "pending",
+    "model": "MKII",
+    "testedOn": "YYYY-MM-DD",
+    "tester": "Your credited tester handle; no email",
+    "project": {
+      "name": "Your local stress project",
+      "sha256": "REPLACE_WITH_PROJECT_FINGERPRINT",
+      "recipe": "Record generator/tool revision and command, local source template fingerprint, sample recipe, all settings and modifications needed to reproduce this stress project. Keep the project/card/firmware local."
+    },
+    "durationMinutes": null,
+    "audioTracks": 8,
+    "midiTracks": null,
+    "conditions": {
+      "parameterExtremes": "Describe every minimum, maximum and branch boundary tested.",
+      "parameterModulation": "Describe simultaneous LFOs, p-locks, MIDI CC and scene sweeps; justify each inapplicable mechanism.",
+      "modeSwitching": "Describe repeated/interrupted mode, bypass and Part changes.",
+      "maxLoad": "Describe maximum voices/instances, both cores, FX slots, streaming and USB/MIDI load.",
+      "inputConditions": "Describe silence, impulses, full-scale inputs, feedback and other worst-case signal conditions."
+    },
+    "checks": {
+      "audioContinuity": "failed",
+      "transport": "failed",
+      "controls": "failed",
+      "memoryIntegrity": "failed",
+      "recovery": "failed"
+    },
+    "report": "TESTING.md",
+    "maxInstances": null
+  },
+  "documentation": {
+    "tutorial": {
+      "title": "Quick tutorial: fatten a drum loop",
+      "steps": [
+        "On a track playing a drum loop, hold FUNC and press FX2, turn LEVEL to FATTENER and press YES. Press FX2 to see FAT, COLOR and GAIN at the JSFX defaults.",
+        "Turn FAT up to about 80: the loop gets louder and denser as the compressor pulls the peaks in and the makeup lifts the rest.",
+        "Turn COLOR up to move the emphasis from the kick towards the snare and hats, and to harden the clip. Use GAIN to drive it harder or back off."
+      ]
+    },
+    "screenshots": [
+      "media/ot-location.png",
+      "media/ot-controls.png",
+      "media/ot-fat-color.png"
+    ],
+    "screenshotStyle": "black-and-white"
+  }
+}

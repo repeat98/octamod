@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 2,
+  "id": "fattener",
+  "key": "FATTENER",
+  "name": "Fattener",
+  "version": "0.1.0-experimental",
+  "category": "effects",
+  "author": {
+    "github": "devilfish707",
+    "credits": [
+      "devilfish707: Fattener DSP56300 port and Octamod draft",
+      "JClones: Fattener JSFX algorithm (MIT), from jsfxclones",
+      "octabam: Sam Banks; SDK, schema and harness (MIT)"
+    ]
+  },
+  "nativeManifest": "manifest.py",
+  "presentation": {
+    "label": "LOUDNESS",
+    "family": "Dynamics",
+    "summary": "A loudness fattener (JClones Fattener) on the DSP: a tuned EQ, a stereo-linked 10:1 compressor with makeup, and a tanh soft clip.",
+    "overview": "Fattener makes a track louder and thicker. A highpass clears the subsonics, a peak EQ that COLOR moves from 40 Hz up to 6.7 kHz while raising it to +8 dB tilts what drives the compressor, a stereo-linked 10:1 compressor whose threshold and makeup FAT sets pushes the level up, and a tanh soft clip with a knee COLOR raises from 0.9 to a hard clip at full scale catches the peaks. GAIN drives it all from -24 to +24 dB. It is a buffer-free insert for FX1 or FX2 on any track. This is a source draft: it is not in the catalog or the firmware builder.",
+    "highlights": [
+      "Port of JClones Fattener (MIT), gain-staged for the Octatrack's FX input level: output level within 0.24 dB and distortion within 0.1 dB of the JSFX's",
+      "FAT, COLOR and GAIN as in the JSFX, at its defaults",
+      "Decays to exact silence: the filters feed their rounding error back, so no whine at full gain",
+      "193 cycles/sample, a quarter less than stock SPRING REV per instance; 698 of SPRING REV's 1,063 program words, no buffer"
+    ],
+    "usage": [
+      "Assign FATTENER in FUNC + FX2 (or FX1) SETUP with LEVEL and YES. It starts at the JSFX defaults: FAT 0, COLOR 0, GAIN 0 dB, which is already a soft compressor.",
+      "Turn FAT up for more compression and makeup: louder and denser. Use GAIN to set how hard the track drives it.",
+      "Turn COLOR up to move the emphasis from the low end towards the top, and to harden the clip."
+    ]
+  },
+  "controls": [
+    {
+      "name": "FAT",
+      "default": 0,
+      "count": 128,
+      "doc": "Fattness, 0 to 127 = 0 to 100%: compressor threshold -1 to -35 dB and makeup +1 to +40 dB together. 0 is the JSFX default.",
+      "labels": null
+    },
+    {
+      "name": "COLOR",
+      "default": 0,
+      "count": 128,
+      "doc": "Color, 0 to 127 = 0 to 100%: the EQ from 40 Hz at 0 dB to 6.7 kHz at +8 dB, and the clip knee from 0.9 to a hard clip at 1.0. 0 is the JSFX default.",
+      "labels": null
+    },
+    {
+      "name": "GAIN",
+      "default": 64,
+      "count": 128,
+      "doc": "Input gain, drawn -64 to +63 for -24 to +23.6 dB in 3/8 dB steps; 0 is 0 dB, the JSFX default.",
+      "labels": null
+    }
+  ],
+  "compatibility": {
+    "firmware": "1.40C",
+    "effectId": 14,
+    "location": "FX1 / FX2",
+    "conflicts": [],
+    "limitations": [
+      "Draft only: not in the catalog, configurator or firmware builder until hardware qualification and owner review are complete.",
+      "AMP VOL is part of the drive, as the track level into the JSFX would be in a DAW.",
+      "For half the DSP time it simplifies the JSFX: one highpass (36.5 Hz) for its 20 + 30 Hz pair, the EQ interpolated between 17 designs (within 0.17 dB), and the compressor's gain computed per 16-sample block and ramped (the envelope still runs every sample).",
+      "At FAT and GAIN near maximum the module adds up to 63 dB of gain, so the filters' last bit is amplified too: impulse tails differ from the float model by up to 5e-3 before reaching exact silence within about 0.14 s.",
+      "The filter and EQ corners assume 44.1 kHz.",
+      "Effect ID 0x0e, priority 20 and layout letter 9 were checked free against the Octamod modules and the TapeHead, IronOxide5 and Inflator drafts only.",
+      "The first test image (OCTABAM10) gave CPU overruns on the unit under p-locks and scene moves; this version (OCTABAM11) ran about ten minutes on four tracks under heavy load on the author's MKII without them. Not stress-tested."
+    ]
+  },
+  "resources": {
+    "recorded": "2 Oct 2026, static, emulator and benchmark.py",
+    "storage": {
+      "label": "DSP program",
+      "display": "698 words P (473 code, 225 table), 160 words X per instance, no buffer",
+      "value": 698,
+      "unit": "words",
+      "method": "static",
+      "conditions": "Composed build report (both payloads place a 225-word P table and 473 words of code in the 1,063-word donor region). Filter states and errors, the envelope, coefficients, polynomial and tanh tables and staging use $00-$9f of the instance's own r7 block; no allocator buffer, no Y memory. SPRING REV: 1,063 words plus the 16,384-word FX2 instance buffer.",
+      "source": "TESTING.md"
+    },
+    "processing": {
+      "label": "DSP estimate",
+      "display": "193 cycles/sample",
+      "value": 193,
+      "unit": "cycles/sample",
+      "method": "static",
+      "conditions": "tools/build/cycle_count.py static count (the frame routine inlined). benchmark.py, executed instructions: one instance 195 per sample (SPRING REV 262); four per core worst 13,536 per 16-sample block (SPRING REV 20,376). With every knob moving every block, 203 instructions per sample in dsp_host. Not a hardware load figure.",
+      "source": "TESTING.md"
+    },
+    "impact": {
+      "conditions": "One active instance; every setting costs the same per sample, and COLOR adds about 130 instructions in a block where it changes.",
+      "cpu": {
+        "level": "minimal",
+        "basis": "source-estimate",
+        "rationale": "No ColdFire code: a DSP insert with a cloned menu descriptor. The ColdFire only forwards three page-1 values.",
+        "source": "TESTING.md"
+      },
+      "dsp": {
+        "level": "low",
+        "basis": "source-estimate",
+        "rationale": "193 cycles/sample by the static counter, about 6% of the 3,120 cycles/core usable by modules; four per core cost a third less executed instructions than four stock SPRING REVs (benchmark.py). Eight on one core (FX1 and FX2 on four tracks) price at 1,544 of 3,120.",
+        "source": "TESTING.md"
+      },
+      "memory": {
+        "level": "low",
+        "basis": "source-estimate",
+        "rationale": "698 words of DSP program per payload (code and its table) and 160 words in each instance's existing r7 block. No allocator buffer or Y memory, where SPRING REV takes 1,063 words and a 16,384-word instance buffer.",
+        "source": "TESTING.md"
+      }
+    }
+  },
+  "tests": {
+    "report": "TESTING.md",
+    "summary": "verify.py renders the assembled module in dsp_host against reference.render_model() (JClones_Fattener.jsfx line for line with the module's three simplifications): peak error 2.1e-3 over ten settings x nine signals at two input levels (within 5 filter LSB times the gain above that), and against the JSFX itself the output level of a sine, a kick and noise within 0.24 dB and its THD at the unit's level within 0.1 dB (gain-staged JSFX(4x)/4). Exact silence (also from a garbage-filled instance block), exact silence again 137 ms after a burst at full gain, stereo link, split calls and cost with every knob moving. The composed test image renders within 6.3e-4 of the model. Benchmarked against stock SPRING REV. Menu, init-register and replace gates pass; MKII emulator LCD captures included. The first build overran on the author's unit under p-locks and scene moves; OCTABAM11 (this source) was played on the author's MKII for about ten minutes on four tracks under heavy load (p-locks and scenes) and reported working great (a listening test, not a stress run).",
+    "hardwareStatus": "untested",
+    "evidenceRevision": "56f3f936207b7bae53842bfe5293acb2ff8e6f3f",
+    "gates": [
+      "verify.py",
+      "benchmark.py",
+      "Worst-case cycles under parameter modulation on hardware",
+      "Real hardware stress project: eight audio tracks, at least 60 minutes"
+    ]
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE",
+    "declaration": "The Fattener port, manifest, generator, gate and documentation are MIT. The algorithm is JClones' Fattener JSFX, MIT, whose notice is in LICENSE and ../../octabam/licenses/jsfxclones.txt. The thumbnail is original and MIT. Emulator LCD captures are LicenseRef-OT-UI-Documentation (media/LICENSE.md). No firmware, extracted routines, tables or generated images are included."
+  },
+  "media": [
+    {
+      "path": "media/ot-location.png",
+      "captureType": "emulator",
+      "caption": "FATTENER assigned in FX2 SETUP, in the row SPRING REV has on a stock unit. It has no SETUP controls.",
+      "alt": "FATTENER assigned in FX2 SETUP, in the row SPRING REV has on a stock unit. It has no SETUP controls.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 SETUP",
+        "shows": "location",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "9500e5bcee18addae560b539966306533886b319019572bf8977a5c51721f650",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the fattener-spring remix: stock effects, FATTENER in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    },
+    {
+      "path": "media/ot-controls.png",
+      "captureType": "emulator",
+      "caption": "FATTENER on the main FX2 page: FAT, COLOR and GAIN at the JSFX defaults.",
+      "alt": "FATTENER on the main FX2 page: FAT, COLOR and GAIN at the JSFX defaults.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 main",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "9500e5bcee18addae560b539966306533886b319019572bf8977a5c51721f650",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the fattener-spring remix: stock effects, FATTENER in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    },
+    {
+      "path": "media/ot-fat-color.png",
+      "captureType": "emulator",
+      "caption": "FAT turned to 80 and COLOR to 40.",
+      "alt": "FAT turned to 80 and COLOR to 40.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 main, FAT 80, COLOR 40",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "9500e5bcee18addae560b539966306533886b319019572bf8977a5c51721f650",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the fattener-spring remix: stock effects, FATTENER in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    }
+  ],
+  "access": {
+    "location": "FUNC + FX1 or FUNC + FX2 SETUP on an audio track: the effect chooser (LEVEL selects, YES assigns). The three controls are on the FX main page.",
+    "steps": [
+      "Select an audio track that plays a sample.",
+      "Hold FUNC and press FX2 (or FX1) to open its SETUP. Turn LEVEL to FATTENER and press YES to assign it.",
+      "Press FX2 (or FX1) to show the main page: FAT, COLOR and GAIN on the top row. The SETUP page has no Fattener controls.",
+      "Verified on the MKII panel of the emulator with the hardware test image; not yet on a unit."
+    ],
+    "screenshots": [
+      "media/ot-location.png",
+      "media/ot-controls.png",
+      "media/ot-fat-color.png"
+    ]
+  }
+}
