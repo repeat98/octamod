@@ -1,0 +1,96 @@
+{
+  "moduleVersion": "0.1.0-experimental",
+  "sourceSha256": "5fb0c75fc1717d48424ace3c2f537fd5aa89c89ff42266b267a318445237871e",
+  "imageSha256": "REPLACE_WITH_LOCAL_TESTED_IMAGE_SHA256",
+  "cycles": [
+    {
+      "processor": "dsp",
+      "worstCase": 194,
+      "maxConfiguration": 1552,
+      "maxInstances": 8,
+      "budget": 3120,
+      "unit": "cycles/sample",
+      "method": "static",
+      "conditions": {
+        "parameterExtremes": "Static count: the sample loop has no branch; the per-block fits branch on HIGH's and the trims' segments, all priced. verify.py renders every knob at 0 and 127 and mixed settings. Hardware: pending.",
+        "parameterModulation": "Pending on hardware. Knobs are read once per block, so modulation changes no per-sample cost; benchmark.py moves every control every block (11,820 vs 11,816 instructions per block fixed).",
+        "modeSwitching": "Pending: repeated FX reselection, NONE bypass and Part changes on hardware.",
+        "maxLoad": "Static: eight instances per core (FX1 and FX2 on four tracks) = 1,552 cycles/sample against 3,120 usable. Not measured on hardware or in a composed image.",
+        "inputConditions": "verify.py: silence, a 0.9 impulse, a 0.5 step and 50 Hz-12 kHz tones at -2 dBFS and at 0.22 FS (a normalized sample at AMP VOL 64). Full-scale and DC worst cases on hardware pending."
+      },
+      "report": "TESTING.md"
+    }
+  ],
+  "memory": {
+    "regions": [
+      {
+        "name": "ironoxide5.asm program (one copy per payload)",
+        "space": "dsp-p",
+        "words": 654,
+        "wordBits": 24,
+        "bytes": 1962,
+        "scope": "shared"
+      },
+      {
+        "name": "r7 state, coefficients and staging: $00-$1b",
+        "space": "dsp-x",
+        "words": 28,
+        "wordBits": 24,
+        "bytes": 84,
+        "scope": "instance"
+      }
+    ],
+    "perInstanceBytes": 84,
+    "sharedBytes": 1971,
+    "maxInstances": 16,
+    "totalBytes": 3315,
+    "conditions": "Composed build report for ironoxide5-spring: 654 words in each payload's donor region. The r7 words lie inside the dispatcher's existing 256-word block for the slot. This record counts one payload's program.",
+    "report": "TESTING.md"
+  },
+  "hardware": {
+    "status": "pending",
+    "model": "MKII",
+    "testedOn": "YYYY-MM-DD",
+    "tester": "Your credited tester handle; no email",
+    "project": {
+      "name": "Your local stress project",
+      "sha256": "REPLACE_WITH_PROJECT_FINGERPRINT",
+      "recipe": "Record generator/tool revision and command, local source template fingerprint, sample recipe, all settings and modifications needed to reproduce this stress project. Keep the project/card/firmware local."
+    },
+    "durationMinutes": null,
+    "audioTracks": 8,
+    "midiTracks": null,
+    "conditions": {
+      "parameterExtremes": "Describe every minimum, maximum and branch boundary tested.",
+      "parameterModulation": "Describe simultaneous LFOs, p-locks, MIDI CC and scene sweeps; justify each inapplicable mechanism.",
+      "modeSwitching": "Describe repeated/interrupted mode, bypass and Part changes.",
+      "maxLoad": "Describe maximum voices/instances, both cores, FX slots, streaming and USB/MIDI load.",
+      "inputConditions": "Describe silence, impulses, full-scale inputs, feedback and other worst-case signal conditions."
+    },
+    "checks": {
+      "audioContinuity": "failed",
+      "transport": "failed",
+      "controls": "failed",
+      "memoryIntegrity": "failed",
+      "recovery": "failed"
+    },
+    "report": "TESTING.md",
+    "maxInstances": null
+  },
+  "documentation": {
+    "tutorial": {
+      "title": "Quick tutorial: put a loop on tape",
+      "steps": [
+        "On a track playing a drum or bass loop, hold FUNC and press FX2, turn LEVEL to IRONOXIDE5 and press YES. Press FX2 to see INPUT, HIGH, LOW, OUT and MIX at their defaults.",
+        "Turn INPUT up to about 90 for more saturation and OUT down to about 50 to keep the level. Lower HIGH towards 40 for a darker, slower tape; raise LOW to thin the bass.",
+        "Turn MIX to 0 to hear the dry track, then back to 127. Re-selecting IRONOXIDE5 clears its internal state."
+      ]
+    },
+    "screenshots": [
+      "media/ot-location.png",
+      "media/ot-controls.png",
+      "media/ot-out.png"
+    ],
+    "screenshotStyle": "black-and-white"
+  }
+}

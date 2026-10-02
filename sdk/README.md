@@ -10,6 +10,8 @@ The initial import includes **Spectrum, Modulation, Character, Mini Verb, Tape E
 
 TapeHead, requested on 2 October 2026, is an [experimental module](octabam/modules/tapehead/README.md): the JClones VladG TapeHead clone (MIT), ported to DSP56300 by devilfish707. It includes reference renders, both-core modulated/split benchmarks, exact memory/code-cycle records, a named tutorial and actual monochrome LCD captures. Hardware operation and parameter locks are author-reported; model, duration and maximum tested load were not supplied. The owner accepted that functional report and removed the mandatory one-hour stress requirement. Browser/native composition and packaging must pass before publication.
 
+IronOxide5, requested on 2 October 2026, is an original [source draft](drafts/ironoxide5/README.md): Airwindows' IronOxide5 (MIT) tape emulation on the DSP, brought over from a local octabam module. Its `verify.py` runs the assembled code in `dsp_host` with no firmware and compares it with a line-for-line port of the plugin's processing; that render found the octabam per-sample path wrong (peak error 2.0), and it was rewritten and optimised. `benchmark.py` measures it against stock SPRING REV, `hardware-test-remix.py` builds a test image with IronOxide5 in Spring Reverb's chooser row, and emulator LCD captures are included. It stays outside native discovery and the catalog until hardware qualification and owner review are complete.
+
 ## Start without firmware or native compilation
 
 Use Node 24 from the monorepo root:

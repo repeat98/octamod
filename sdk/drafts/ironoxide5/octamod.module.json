@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 2,
+  "id": "ironoxide5",
+  "key": "IRONOXIDE5",
+  "name": "IronOxide5",
+  "version": "0.1.0-experimental",
+  "category": "effects",
+  "author": {
+    "github": "devilfish707",
+    "credits": [
+      "devilfish707: IronOxide5 DSP56300 port, octabam module and Octamod draft",
+      "Airwindows (Chris Johnson): IronOxide5 algorithm, MIT",
+      "octabam: Sam Banks; SDK, schema and harness (MIT)"
+    ]
+  },
+  "nativeManifest": "manifest.py",
+  "presentation": {
+    "label": "TAPE EMULATION",
+    "family": "Saturation",
+    "summary": "Airwindows IronOxide5 on the DSP: tape-speed filtering and two stages of sine saturation, with input and output trim.",
+    "overview": "IronOxide5 thins the low end with its tape-low filter, drives the signal into a sine saturator, smooths it through a leaky tape-speed integrator and limits it with a second sine stage. HIGH sets the tape speed (brighter and tighter as it rises), LOW the lean-out, INPUT the drive and OUT the level. MIX blends from dry at 0 to fully wet at 127. Flutter and noise are not implemented. It is a buffer-free insert for FX1 or FX2 on any track. This is a source draft: it is not in the catalog or the firmware builder.",
+    "highlights": [
+      "Port of Airwindows IronOxide5 at Flutter and Noise 0, within 3.7e-4 of the plugin's own code, gain-staged for the Octatrack's FX input level",
+      "INPUT and OUT trims of -18 to +18 dB, tape speed 1.65 to 165 ips",
+      "MIX from dry to fully wet",
+      "185 executed instructions per sample: 29% below stock SPRING REV"
+    ],
+    "usage": [
+      "Assign IRONOXIDE5 in FUNC + FX2 (or FX1) SETUP with LEVEL and YES. Defaults are the plugin's: INPUT and OUT at 0 dB, 15 ips, fully wet.",
+      "Raise INPUT for more saturation and pull OUT down to match the level. HIGH darkens and loosens the sound as it falls; LOW thins the bass as it rises.",
+      "Turn MIX down from 127 to blend the tape sound with the dry track; 0 is dry."
+    ]
+  },
+  "controls": [
+    {
+      "name": "INPUT",
+      "default": 64,
+      "count": 128,
+      "doc": "Input trim, -18 dB at 0 to +18 dB at 127; 64 is 0 dB, the plugin default.",
+      "labels": null
+    },
+    {
+      "name": "HIGH",
+      "default": 72,
+      "count": 128,
+      "doc": "Tape speed: 1.65 to 165 ips as knob^4. Higher is brighter and tighter; 72 is the plugin's 15 ips.",
+      "labels": null
+    },
+    {
+      "name": "LOW",
+      "default": 72,
+      "count": 128,
+      "doc": "Tape low: higher values cut more low end before the saturator; 72 is the plugin default.",
+      "labels": null
+    },
+    {
+      "name": "OUT",
+      "default": 64,
+      "count": 128,
+      "doc": "Output trim of the wet signal, -18 dB at 0 to +18 dB at 127; 64 is 0 dB.",
+      "labels": null
+    },
+    {
+      "name": "MIX",
+      "default": 127,
+      "count": 128,
+      "doc": "Dry/wet: 0 is dry, 127 fully wet (the plugin default). The plugin's knob also has an inverted half below dry, which is not used.",
+      "labels": null
+    }
+  ],
+  "compatibility": {
+    "firmware": "1.40C",
+    "effectId": 30,
+    "location": "FX1 / FX2",
+    "conflicts": [],
+    "limitations": [
+      "Draft only: not in the catalog, configurator or firmware builder until hardware qualification and owner review are complete.",
+      "Flutter and noise (the plugin's D and E) are not implemented; this is the plugin at D = E = 0.",
+      "OUT above 64 can drive the output past full scale; the DSP's output store limits it.",
+      "This revision rewrites the octabam build's per-sample path (see TESTING.md). OCTABAM3 and OCTABAM4 were flashed on 2 Oct 2026 (MIX not dry; then less saturation than the plugin). OCTABAM8, with the input level fixed, was flashed the same day and reported working (a listening test).",
+      "MIX covers the upper half of the plugin's inv/dry/wet knob (dry to wet); the inverted half is not available.",
+      "Effect ID 0x1e, priority 18 and layout letter 5 were checked free against the eleven Octamod modules and the TapeHead draft only."
+    ]
+  },
+  "resources": {
+    "recorded": "2 Oct 2026, static, emulator and benchmark.py",
+    "storage": {
+      "label": "DSP program",
+      "display": "654 words P, 28 words X per instance, no buffer",
+      "value": 654,
+      "unit": "words",
+      "method": "static",
+      "conditions": "Composed build report (both payloads place 654 words in the donor region). State, coefficients and staging use 28 words of the instance's own r7 block; no allocator buffer, no Y memory. SPRING REV: 1,063 words plus the 16,384-word FX2 instance buffer.",
+      "source": "TESTING.md"
+    },
+    "processing": {
+      "label": "DSP estimate",
+      "display": "194 cycles/sample",
+      "value": 194,
+      "unit": "cycles/sample",
+      "method": "static",
+      "conditions": "tools/build/cycle_count.py static count of the sample loop. benchmark.py, executed instructions: 185/sample for one instance (SPRING REV 262); four per core worst 13,144 per 16-sample block (SPRING REV 20,376). Not a hardware load figure.",
+      "source": "TESTING.md"
+    },
+    "impact": {
+      "conditions": "One active instance at any setting; no stage is skipped, and the per-block coefficient fits cost the same in every segment.",
+      "cpu": {
+        "level": "minimal",
+        "basis": "source-estimate",
+        "rationale": "No ColdFire code: a DSP insert with a cloned menu descriptor. The ColdFire only forwards five page-1 values.",
+        "source": "TESTING.md"
+      },
+      "dsp": {
+        "level": "low",
+        "basis": "source-estimate",
+        "rationale": "194 cycles/sample by the static counter, about 6% of the 3,120 cycles/core usable by modules. benchmark.py: 29% fewer executed instructions than stock SPRING REV for one instance and 35% fewer at the worst four-per-core case.",
+        "source": "TESTING.md"
+      },
+      "memory": {
+        "level": "low",
+        "basis": "source-estimate",
+        "rationale": "654 words of DSP program per payload and 28 words in each instance's existing r7 block. No allocator buffer or Y memory, where SPRING REV takes 1,063 words and a 16,384-word instance buffer.",
+        "source": "TESTING.md"
+      }
+    }
+  },
+  "tests": {
+    "report": "TESTING.md",
+    "summary": "verify.py renders the assembled module in dsp_host against the plugin's own float code: peak error 3.7e-4 over nine settings x seven signals at two input levels, the plugin's THD at the unit's level within 1 dB, exact silence, MIX 0 dry within 1 LSB at any setting, stereo independence and split blocks. The composed test image renders within 4.7e-5 at the defaults. Benchmarked against stock SPRING REV. Menu, init-register and replace gates pass; MKII emulator LCD captures included. OCTABAM3 was flashed on 2 Oct 2026; MIX 0 was not dry there (the plugin's inverted half), fixed in OCTABAM4. OCTABAM4 (flashed 2 Oct 2026) saturated less than the plugin because the unit feeds FX 12 dB below DAW level; fixed in OCTABAM8 (plugin(4x)/4), which the author flashed and reported working the same day (a listening test, not a stress run).",
+    "hardwareStatus": "untested",
+    "evidenceRevision": "433fa32c0f5b381cf5a71930dc45e121609b7f4d",
+    "gates": [
+      "verify.py",
+      "benchmark.py",
+      "Worst-case cycles under parameter modulation on hardware",
+      "Real hardware stress project: eight audio tracks, at least 60 minutes"
+    ]
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE",
+    "declaration": "The IronOxide5 port, manifest, gate and documentation are MIT. The algorithm is Airwindows' IronOxide5, MIT, whose notice is in LICENSE and ../../octabam/licenses/airwindows.txt. The thumbnail is original and MIT. Emulator LCD captures are LicenseRef-OT-UI-Documentation (media/LICENSE.md). No firmware, extracted routines, tables or generated images are included."
+  },
+  "media": [
+    {
+      "path": "media/ot-location.png",
+      "captureType": "emulator",
+      "caption": "IRONOXIDE5 assigned in FX2 SETUP, in the row SPRING REV has on a stock unit. It has no SETUP controls.",
+      "alt": "IRONOXIDE5 assigned in FX2 SETUP, in the row SPRING REV has on a stock unit. It has no SETUP controls.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 SETUP",
+        "shows": "location",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "f2e053009b7a1a7997920bab0a2912f9975dfc7c62182ec914dce0109d49d1b4",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the ironoxide5-spring remix: stock effects, IRONOXIDE5 in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    },
+    {
+      "path": "media/ot-controls.png",
+      "captureType": "emulator",
+      "caption": "IRONOXIDE5 on the main FX2 page: INPUT, HIGH, LOW, OUT and MIX at their defaults.",
+      "alt": "IRONOXIDE5 on the main FX2 page: INPUT, HIGH, LOW, OUT and MIX at their defaults.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 main",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "f2e053009b7a1a7997920bab0a2912f9975dfc7c62182ec914dce0109d49d1b4",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the ironoxide5-spring remix: stock effects, IRONOXIDE5 in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    },
+    {
+      "path": "media/ot-out.png",
+      "captureType": "emulator",
+      "caption": "OUT turned from 64 to 74 with encoder D: the knob prints its value.",
+      "alt": "OUT turned from 64 to 74 with encoder D: the knob prints its value.",
+      "credit": "Octamod contributors (headless capture)",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "FX2 main, OUT moved",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "f2e053009b7a1a7997920bab0a2912f9975dfc7c62182ec914dce0109d49d1b4",
+        "setup": "ot_emu (MKII panel) on 1.40C composed with the ironoxide5-spring remix: stock effects, IRONOXIDE5 in SPRING REV's FX2 row, stock DSP code built in; empty scratch card; transport stopped; actual 128x64 LCD pixels at integer scale 6."
+      }
+    }
+  ],
+  "access": {
+    "location": "FUNC + FX1 or FUNC + FX2 SETUP on an audio track: the effect chooser (LEVEL selects, YES assigns). The five controls are on the FX main page.",
+    "steps": [
+      "Select an audio track that plays a sample.",
+      "Hold FUNC and press FX2 (or FX1) to open its SETUP. Turn LEVEL to IRONOXIDE5 and press YES to assign it.",
+      "Press FX2 (or FX1) to show the main page: INPUT, HIGH, LOW on the top row, OUT and MIX below. The SETUP page has no IronOxide5 controls.",
+      "Verified on the MKII panel of the emulator with the hardware test image; not yet on a unit."
+    ],
+    "screenshots": [
+      "media/ot-location.png",
+      "media/ot-controls.png",
+      "media/ot-out.png"
+    ]
+  }
+}

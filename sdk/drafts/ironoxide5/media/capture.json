@@ -1,0 +1,116 @@
+{
+  "firmware": "1.40C",
+  "imageSha256": "f2e053009b7a1a7997920bab0a2912f9975dfc7c62182ec914dce0109d49d1b4",
+  "emulatorSha256": "2360ffb244833bc015cdc84ecc36394758bf93952034a8b08a63e1955af85115",
+  "setup": "Headless ot_emu; MKII panel; stopped transport; 128×64 LCD at integer scale 6.",
+  "palette": {
+    "on": [
+      240,
+      240,
+      240
+    ],
+    "off": [
+      24,
+      24,
+      24
+    ]
+  },
+  "keyMs": 150,
+  "plan": [
+    {
+      "wait": 3000
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "wait": 2000
+    },
+    {
+      "press": [
+        "NO"
+      ]
+    },
+    {
+      "press": [
+        "FUNC",
+        "FX2"
+      ]
+    },
+    {
+      "encoder": {
+        "name": "LEVEL",
+        "delta": -20
+      }
+    },
+    {
+      "encoder": {
+        "name": "LEVEL",
+        "delta": 13
+      }
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "capture": "location.png"
+    },
+    {
+      "press": [
+        "FX2"
+      ]
+    },
+    {
+      "capture": "controls.png"
+    },
+    {
+      "encoder": {
+        "name": "D",
+        "delta": 10
+      }
+    },
+    {
+      "capture": "out-turned.png"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "media/ot-location.png",
+      "sha256": "017dc5ebecbfe1538308eb36b067005b70c5eee39db6a86965bb656d301727ed"
+    },
+    {
+      "path": "media/ot-controls.png",
+      "sha256": "647e18d82bc623be12ff70027cdfd2e45aa4e33f7b11a82064e840ffa3bc3aee"
+    },
+    {
+      "path": "media/ot-out.png",
+      "sha256": "1b7df965b657d292a7bcb53352832abde90b2260726bf211773e612a007feb9f"
+    }
+  ],
+  "moduleId": "ironoxide5",
+  "moduleVersion": "0.1.0-experimental",
+  "captured": "2026-10-02",
+  "imageProfile": {
+    "remix": "ironoxide5-spring (hardware-test-remix.py)",
+    "fx2Row": "IRONOXIDE5 in SPRING REV's position",
+    "staticStock": true
+  },
+  "captureFiles": {
+    "media/ot-location.png": "location.png",
+    "media/ot-controls.png": "controls.png",
+    "media/ot-out.png": "out-turned.png"
+  },
+  "sourceSha256": {
+    "ironoxide5.asm": "5fb0c75fc1717d48424ace3c2f537fd5aa89c89ff42266b267a318445237871e",
+    "manifest.py": "7592763a186ae7cdbc0c0238495c2130e1695b65b7f8d9f795e3dfea42684a36"
+  },
+  "limitations": [
+    "Emulator UI evidence only; no hardware, audio or stress qualification.",
+    "Empty scratch card, no samples or projects."
+  ],
+  "note": "Re-captured on the OCTABAM8 image (input-level fix) with the same plan and ot_emu binary: all three PNGs byte-identical to the OCTABAM4 captures."
+}
