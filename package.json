@@ -30,6 +30,7 @@
     "build:bundle": "vite build"
   },
   "dependencies": {
+    "better-auth": "1.7.7",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

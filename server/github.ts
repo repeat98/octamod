@@ -97,7 +97,7 @@ export async function setGithubIssueState(config: GithubConfig, number: number, 
   await github(config, '/issues/' + number, 'PATCH', status === 'closed' ? { state: 'closed', state_reason: 'completed' } : { state: 'open' })
 }
 
-type IssueRow = { id: string; module_id: string; author_login: string; title: string; body: string; reporter: string; context_json: string | null; log_missing: LogMissingReason | null; log_missing_note: string; github_state: string; log_text: string | null; summary_json: string | null }
+type IssueRow = { id: string; module_id: string; author_login: string; title: string; body: string; reporter: string; context_json: string | null; log_missing: LogMissingReason | null; log_missing_note: string; github_state: string; public_sharing: number; log_text: string | null; summary_json: string | null }
 
 /**
  * Create the GitHub issue for a stored report. The report is kept whatever GitHub answers.
@@ -106,8 +106,10 @@ type IssueRow = { id: string; module_id: string; author_login: string; title: st
 export async function mirrorIssue(db: Database, env: Env, id: string, stale = false) {
   const config = githubConfig(env)
   if (!config) return { state: 'none' as const }
-  const row = await db.prepare('SELECT i.id,i.module_id,i.author_login,i.title,i.body,i.context_json,i.log_missing,i.log_missing_note,i.github_state,u.display_name AS reporter,l.text AS log_text,l.summary_json FROM issues i JOIN users u ON u.id=i.reporter_id LEFT JOIN issue_logs l ON l.issue_id=i.id WHERE i.id=?').bind(id).first<IssueRow>()
+  const row = await db.prepare('SELECT i.id,i.module_id,i.author_login,i.title,i.body,i.context_json,i.log_missing,i.log_missing_note,i.github_state,i.public_sharing,u.display_name AS reporter,l.text AS log_text,l.summary_json FROM issues i JOIN users u ON u.id=i.reporter_id LEFT JOIN issue_logs l ON l.issue_id=i.id WHERE i.id=?').bind(id).first<IssueRow>()
   if (!row) throw new HttpError(404, 'Issue not found.')
+  // No new or historical report is granted publication by the account migration.
+  if (!row.public_sharing) throw new HttpError(400, 'This report is private and cannot be published to GitHub.')
   // Claim the row so concurrent requests cannot open two GitHub issues.
   const claimable = stale ? "('none','pending','failed','syncing')" : "('none','pending','failed')"
   if (!await db.prepare("UPDATE issues SET github_state='syncing',github_error='' WHERE id=? AND github_state IN " + claimable + " RETURNING id").bind(id).first()) return { state: row.github_state as 'synced' | 'syncing' }

@@ -1,3 +1,6 @@
+import { AccountPage } from './community/AccountPage'
+import { ForumPage } from './community/ForumPage'
+import './community/forum.css'
 import { trackPageView, trackUsage } from './community/usage'
 import { PrivacyPage } from './community/PrivacyPage'
 import { INDEPENDENCE_NOTICE, FLASHING_RISKS, FIRMWARE_SHARING_NOTICE } from './firmware-notices'
@@ -12,7 +15,6 @@ import { ModulePopularity } from './community/ModulePopularity'
 import { selectionConflicts, type ConflictFix } from './catalog/selection-conflicts'
 import { CompatibilityPanel } from './components/CompatibilityPanel'
 import { useCommunity } from './community/context'
-import { ActivityPage } from './community/ActivityPage'
 import { SubmissionPage } from './community/SubmissionPage'
 import { AdminPage } from './community/AdminPage'
 import { PublishedModulePage } from './community/PublishedModulePage'
@@ -52,7 +54,7 @@ function subscribePhoneLayout(callback: () => void) {
   return () => media.removeEventListener('change', callback)
 }
 function getPhoneLayout() { return window.matchMedia(PHONE_LAYOUT).matches }
-function getRoute() { const route=window.location.hash.slice(1)||'library'; return route==='remixes'?'module-sets':route==='account'?'activity':route.startsWith('remix/')?'module-set/'+route.slice(6):route }
+function getRoute() { const route=window.location.hash.slice(1)||'library'; return route==='activity'?'account':route==='remixes'?'module-sets':route.startsWith('remix/')?'module-set/'+route.slice(6):route }
 
 export default function App() {
   const route = useSyncExternalStore(subscribeRoute, getRoute, () => 'library')
@@ -63,8 +65,10 @@ export default function App() {
   const configuration = route === 'configuration'
   const { session, catalog } = useCommunity()
   const communityModule = route.startsWith('community-module/') ? catalog.find(item => item.module_id === route.slice(17) && !isModulePaused(item.module_id)) : undefined
-  const communityRoute = route === 'activity' || route === 'review' || route === 'admin' || route.startsWith('submit') || !!communityModule
-  const missingRoute=!['library',...LIBRARY_CATEGORIES,'module-sets','configuration','faq','activity','review','admin','privacy'].includes(route)&&!route.startsWith('submit')&&!detailModule&&!communityModule&&!route.startsWith('module-set/')
+  const forumRoute = route === 'forum' || route.startsWith('forum/') || route.startsWith('forum?')
+  const accountRoute = route === 'account' || route.startsWith('account/')
+  const communityRoute = forumRoute || accountRoute || route === 'review' || route === 'admin' || route.startsWith('submit') || !!communityModule
+  const missingRoute=!forumRoute&&!accountRoute&&!['library',...LIBRARY_CATEGORIES,'module-sets','configuration','faq','review','admin','privacy'].includes(route)&&!route.startsWith('submit')&&!detailModule&&!communityModule&&!route.startsWith('module-set/')
   const filter = LIBRARY_CATEGORIES.find(category => category === route) ?? 'all'
   const categoryLabels = { effects:'Effects', playback:'Playback', machines:'Machines & sequencer', scenes:'Scenes', 'midi-usb':'MIDI & USB', system:'System' }
   const workspace = useWorkspace()
@@ -103,7 +107,7 @@ export default function App() {
     if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     else libraryNavRef.current?.scrollTo({ left: 0 })
   }, [route])
-  useEffect(() => { mainRef.current?.scrollTo({ top: 0 });document.title=(detailModule?.name??(route==='faq'?'FAQ':route==='privacy'?'Privacy':route==='configuration'?'Configuration':route.startsWith('submit')?'Submit a module':route==='activity'?'Your activity':(route==='review'||route==='admin')?'Admin workspace':route.startsWith('module-set')?'Module sets':'Module library'))+' · Octamod' }, [route,detailModule?.name])
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 });document.title=(detailModule?.name??(forumRoute?'Forum':accountRoute?'Account':route==='faq'?'FAQ':route==='privacy'?'Privacy':route==='configuration'?'Configuration':route.startsWith('submit')?'Submit a module':(route==='review'||route==='admin')?'Admin workspace':route.startsWith('module-set')?'Module sets':'Module library'))+' · Octamod' }, [route,detailModule?.name,forumRoute,accountRoute])
   const selection = resolveSelection(selectedIds)
   const availabilityError = moduleAvailabilityError(selectedIds)
   const conflicts = selectionConflicts(selectedIds, DSP_LOADER && (active?.keepStockFx2 ?? true))
@@ -169,7 +173,7 @@ export default function App() {
         </nav>
         <div className="sidebar-section-label configuration-label"><span>Configurations</span><button className="icon-button" aria-label="New configuration" disabled={!ready} onClick={() => setConfigDialog("create")}><Icon name="plus" size={18} /></button></div>
         <nav className="sidebar-nav configuration-nav" aria-label="Saved configurations">{workspace.configurations.map(item => <button key={item.id} className={item.id === active?.id ? 'active' : ''} aria-pressed={item.id === active?.id} onClick={() => changeConfiguration(item.id)}><Icon name="file" /><span>{item.name}</span><small>{item.moduleIds.length}</small></button>)}</nav>
-        <div className="sidebar-section-label community-label">Community & help</div><nav className="sidebar-nav community-nav" aria-label="Community and help"><a href="#submit" className={route.startsWith('submit') ? 'active' : ''}><Icon name="plus"/><span>Submit a module</span></a><a href="#activity" className={route === 'activity' ? 'active' : ''}><Icon name="message"/><span>Your activity</span></a>{session.admin && <a href="#admin" className={route === 'admin'||route === 'review' ? 'active' : ''}><Icon name="shield"/><span>Admin workspace</span></a>}<a href="#faq" className={route === 'faq' ? 'active' : ''} aria-current={route === 'faq' ? 'page' : undefined}><Icon name="help" /><span>FAQ<span className="help-guide-label"> & flashing guide</span></span></a></nav>
+        <div className="sidebar-section-label community-label">Community & help</div><nav className="sidebar-nav community-nav" aria-label="Community and help"><a href="#forum" className={forumRoute?'active':''}><Icon name="message"/><span>Forum</span></a><a href="#account" className={accountRoute?'active':''}><Icon name="shield"/><span>{session.user?.verified?'Your account':'Sign in / register'}</span></a><a href="#submit" className={route.startsWith('submit') ? 'active' : ''}><Icon name="plus"/><span>Submit a module</span></a>{session.admin && <a href="#admin" className={route === 'admin'||route === 'review' ? 'active' : ''}><Icon name="shield"/><span>Admin workspace</span></a>}<a href="#faq" className={route === 'faq' ? 'active' : ''} aria-current={route === 'faq' ? 'page' : undefined}><Icon name="help" /><span>FAQ<span className="help-guide-label"> & flashing guide</span></span></a></nav>
         <div className="sidebar-spacer" />
         <a className="sidebar-build" href="#configuration" aria-label={firmware ? 'Base firmware ready — View configuration' : undefined} aria-describedby={firmware ? 'sidebar-firmware-status' : undefined}>
           <span className={'status-dot ' + (firmware ? 'verified' : '')} />
@@ -193,10 +197,10 @@ export default function App() {
           {!phoneLayout && projectNotice}
           {workspace.storageError && <div className="file-error" role="alert">{workspace.storageError} Export important configurations before closing this tab.</div>}
           {route === 'faq' ? <FaqPage /> : !ready ? <div className="loading-panel" role="status">Opening your workspace…</div> : <>
-          {missingRoute?<div className="no-results"><h1>{pausedModule ? 'Module temporarily unavailable' : 'Page not found'}</h1><p>{pausedModule ? pausedModule.name + ' has been temporarily removed due to reported audio crackling.' : 'This module or page is not in the current catalog.'}</p><a className="button button-quiet" href="#library">Open module library</a></div>:route==='module-sets'||route.startsWith('module-set/')?<ModuleSets query={query} id={route.startsWith('module-set/')?route.slice(11):undefined} onUse={(name,ids)=>{workspace.importConfiguration(name,ids);window.location.assign('#configuration')}}/>:route === 'privacy' ? <PrivacyPage /> : route === 'activity' ? <ActivityPage /> : route.startsWith('submit') ? <SubmissionPage key={route} moduleId={route.split('/')[1] ?? ''} /> : route === 'review'||route === 'admin' ? <AdminPage /> : communityModule ? <PublishedModulePage module={communityModule} /> : detailModule ? <ModuleDetail key={detailModule.id} module={detailModule} selected={selectedIds.includes(detailModule.id)} onToggle={() => toggleModule(detailModule.id)} /> : configuration ? (
+          {missingRoute?<div className="no-results"><h1>{pausedModule ? 'Module temporarily unavailable' : 'Page not found'}</h1><p>{pausedModule ? pausedModule.name + ' has been temporarily removed due to reported audio crackling.' : 'This module or page is not in the current catalog.'}</p><a className="button button-quiet" href="#library">Open module library</a></div>:route==='module-sets'||route.startsWith('module-set/')?<ModuleSets query={query} id={route.startsWith('module-set/')?route.slice(11):undefined} onUse={(name,ids)=>{workspace.importConfiguration(name,ids);window.location.assign('#configuration')}}/>:forumRoute ? <ForumPage key={route} route={route} configuration={active} onCopy={config=>{workspace.importConfiguration(config.name,config.moduleIds,config.keepStockFx2,config.moduleVersions);window.location.assign('#configuration')}}/> : accountRoute ? <AccountPage key={route.split('/').slice(0,2).join('/')} route={route}/> : route === 'privacy' ? <PrivacyPage /> : route.startsWith('submit') ? <SubmissionPage key={route} moduleId={route.split('/')[1] ?? ''} /> : route === 'review'||route === 'admin' ? <AdminPage /> : communityModule ? <PublishedModulePage module={communityModule} /> : detailModule ? <ModuleDetail key={detailModule.id} module={detailModule} selected={selectedIds.includes(detailModule.id)} onToggle={() => toggleModule(detailModule.id)} /> : configuration ? (
             <div className="configuration-page">
               <div className="page-heading"><div><p className="page-kicker">YOUR WORKSPACE</p><h1>{active?.name}</h1><p>Changes save automatically on this device. Configurations use current module versions.</p></div><span className="pill">OS 1.40C</span></div>
-              <div className="configuration-actions"><select aria-label="Choose configuration" value={active?.id ?? ''} onChange={event => changeConfiguration(event.target.value)}>{workspace.configurations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="button button-primary" onClick={() => setConfigDialog('create')}><Icon name="plus" size={16} />New</button><button className="button button-quiet" onClick={() => setConfigDialog('rename')}>Rename</button><button className="button button-quiet" onClick={() => setConfigDialog('duplicate')}>Duplicate</button><button className="button button-quiet" onClick={() => setConfigDialog('delete')}>Delete</button><button className="button button-quiet" onClick={()=>importRef.current?.click()}>Import JSON</button></div><input ref={importRef} type="file" accept="application/json,.json" hidden onChange={event=>void importSelection(event)} aria-label="Import configuration backup"/>{importError&&<p className="file-error" role="alert">{importError}</p>}
+              <div className="configuration-actions"><select aria-label="Choose configuration" value={active?.id ?? ''} onChange={event => changeConfiguration(event.target.value)}>{workspace.configurations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="button button-primary" onClick={() => setConfigDialog('create')}><Icon name="plus" size={16} />New</button><button className="button button-quiet" onClick={() => setConfigDialog('rename')}>Rename</button><button className="button button-quiet" onClick={() => setConfigDialog('duplicate')}>Duplicate</button><button className="button button-quiet" onClick={() => setConfigDialog('delete')}>Delete</button><button className="button button-quiet" onClick={()=>importRef.current?.click()}>Import JSON</button><a className="button button-quiet" href="#forum/new?category=configs">Share in forum</a></div><input ref={importRef} type="file" accept="application/json,.json" hidden onChange={event=>void importSelection(event)} aria-label="Import configuration backup"/>{importError&&<p className="file-error" role="alert">{importError}</p>}
               <aside className="risk-note" role="note" aria-labelledby="project-compatibility-title">
                 <strong id="project-compatibility-title">Start with a fresh Octatrack project</strong>
                 <p>After installing a new firmware build, create and open a fresh project on your Octatrack. Back up your existing projects first.</p>

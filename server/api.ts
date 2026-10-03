@@ -1,16 +1,18 @@
+import { forum } from './forum'
 import { recordUsage, recordModuleDownload, usageStatistics } from './usage'
 import { moduleStatistics } from './module-statistics'
 import { adminInsights } from './admin-insights'
 import recipes from '../src/catalog/module-sets.json'
 import type { Database, Env, Media, User } from './platform'
-import { ADMIN_ACTOR, authentication, currentUser, guest, isAdmin, throttle } from './auth'
+import { reviewAccountRequest } from './account-requests'
+import { ADMIN_ACTOR, authentication, currentUser, needMember, isAdmin, throttle } from './auth'
 import { boundedBody, checkOrigin, HttpError, jsonBody, required, response } from './security'
 import { MODULES } from '../src/catalog/modules'
 import { handleGithubWebhook, githubConfig, mirrorIssue, setGithubIssueState } from './github'
 import { IssueInputError, validateIssueContext, validateLogMissing } from '../src/community/issue-context'
 import { OT_LOG_MAX_BYTES, OtLogError, parseOtLog } from '../src/community/ot-log'
 
-function needUser(user: User | null): User { if (!user) throw new HttpError(401,'No guest session is saved on this device.'); return user }
+function needUser(user: User | null): User { if (!user) throw new HttpError(401,'Sign in to manage your activity.'); return user }
 async function knownModule(db: Database, id: string) {
   if (MODULES.some(module => module.id === id)||recipes.some(recipe=>'remix-'+recipe.id===id)) return
   if (!await db.prepare("SELECT submission_id FROM module_publications WHERE module_id=?").bind(id).first()) throw new HttpError(404,'Module not found.')
@@ -33,8 +35,10 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     if (!db) throw new HttpError(503,'Community services are not connected yet. Your device workspace still works.')
     if (path === '/api/usage/events' && request.method === 'POST') return await recordUsage(request,env,db)
     if (path === '/api/usage/module-downloads' && request.method === 'POST') return await recordModuleDownload(request,env,db)
-    const user = await currentUser(request,db)
+    const user = await currentUser(request,db,env)
     const admin = await isAdmin(request,env,db)
+    const discussion = await forum(request,db,user,admin)
+    if(discussion)return discussion
     let match: RegExpMatchArray | null
     if ((match = path.match(/^\/api\/media\/([^/]+)$/)) && request.method === 'GET') {
       const item = await db.prepare('SELECT m.*,s.status,s.owner_id,p.submission_id AS published FROM media m JOIN submissions s ON s.id=m.submission_id LEFT JOIN module_publications p ON p.submission_id=s.id WHERE m.id=?').bind(match[1]).first<Media & {status:string;owner_id:string;published:string|null}>()
@@ -62,12 +66,12 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       await throttle(db,'community-ip:'+(request.headers.get('CF-Connecting-IP')??'local'),30)
       if(match[2]==='comments')required(body.body,'Comment',2000)
       else if(match[2]==='rating'&&(!Number.isInteger(body.value)||Number(body.value)<1||Number(body.value)>5))throw new HttpError(400,'Choose a rating from 1 to 5.')
-      const visitor=await guest(request,env,db,typeof body.displayName==='string'&&body.displayName.trim()?required(body.displayName,'Display name',60):'Guest'),owner=visitor.user
+      const owner=needMember(user)
       await throttle(db,'community:' + owner.id,30)
       if (match[2] === 'comments') { await db.prepare('INSERT INTO comments(id,module_id,user_id,body) VALUES(?,?,?,?)').bind(crypto.randomUUID(),match[1],owner.id,required(body.body,'Comment',2000)).run() }
       else if(match[2]==='like'){if(typeof body.liked!=='boolean')throw new HttpError(400,'Choose liked or unliked.');if(body.liked)await db.prepare('INSERT INTO likes(module_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING').bind(match[1],owner.id).run();else await db.prepare('DELETE FROM likes WHERE module_id=? AND user_id=?').bind(match[1],owner.id).run()}
       else { const rating = Number(body.value); if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400,'Choose a rating from 1 to 5.'); await db.prepare('INSERT INTO ratings(module_id,user_id,value) VALUES(?,?,?) ON CONFLICT(module_id,user_id) DO UPDATE SET value=excluded.value').bind(match[1],owner.id,rating).run() }
-      const result=response({ok:true});if(visitor.cookie)result.headers.append('Set-Cookie',visitor.cookie);if(visitor.sessionToken)result.headers.set('X-Octamod-Session',visitor.sessionToken);return result
+      return response({ok:true})
     }
     if ((match = path.match(/^\/api\/comments\/([^/]+)$/)) && request.method === 'DELETE') {
       if (admin) await db.prepare('DELETE FROM comments WHERE id=?').bind(match[1]).run()
@@ -75,6 +79,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       return response({ok:true})
     }
     if ((match=path.match(/^\/api\/modules\/([a-z0-9-]+)\/issues$/)) && request.method==='POST') {
+      const owner=needMember(user)
       await knownModule(db,match[1]);const body=await jsonBody(request,OT_LOG_MAX_BYTES+32*1024)
       if(typeof body.steps!=='string'&&typeof body.body==='string')throw new HttpError(400,'Issue reports now include your configuration and OCTAMOD.LOG. Reload the page and report again.')
       const title=required(body.title,'Issue title',160),steps=required(body.steps,'Steps to reproduce',3000),expected=required(body.expected,'Expected result',1000),actual=required(body.actual,'Actual result',2000)
@@ -84,27 +89,30 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       const log=attached?issueInput(()=>parseOtLog(body.log as string)):null
       const missing=log?null:issueInput(()=>validateLogMissing(body.logMissing,context))
       await throttle(db,'issue-ip:'+(request.headers.get('CF-Connecting-IP')??'local'),10)
-      // Every report may open a public GitHub issue: cap the total so the token cannot be used to flood the repository.
+      // Bound stored reports across the site as well as per IP and member.
       await throttle(db,'issue-global',60)
       const core=MODULES.find(item=>item.id===match![1])
       const recipe=recipes.find(item=>'remix-'+item.id===match![1])
       const published=core||recipe?null:await db.prepare("SELECT u.github_login FROM module_publications p JOIN submissions s ON s.id=p.submission_id JOIN users u ON u.id=s.owner_id WHERE p.module_id=?").bind(match[1]).first<{github_login:string}>()
       const author=core?.author??recipe?.author??published?.github_login
       if(!author)throw new HttpError(400,'No author is registered for this module.')
-      const visitor=await guest(request,env,db,typeof body.displayName==='string'&&body.displayName.trim()?required(body.displayName,'Display name',60):'Guest')
+      await throttle(db,'issue-member:'+owner.id,10)
       const id=crypto.randomUUID(),details='Steps to reproduce:\n'+steps+'\n\nExpected:\n'+expected+'\n\nActual:\n'+actual
-      const statements=[db.prepare('INSERT INTO issues(id,module_id,author_login,reporter_id,title,body,context_json,log_missing,log_missing_note,github_state) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,match[1],author,visitor.user.id,title,details,JSON.stringify(context),missing?.reason??null,missing?.note??'',githubConfig(env)?'pending':'none')]
+      const statements=[db.prepare('INSERT INTO issues(id,module_id,author_login,reporter_id,title,body,context_json,log_missing,log_missing_note,github_state) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(id,match[1],author,owner.id,title,details,JSON.stringify(context),missing?.reason??null,missing?.note??'','none')]
       if(log)statements.push(db.prepare('INSERT INTO issue_logs(issue_id,text,bytes,summary_json) VALUES(?,?,?,?)').bind(id,log.text,log.text.length,JSON.stringify(log.summary)))
       await db.batch(statements)
-      const github=await mirrorIssue(db,env,id)
-      const result=response({ok:true,author,github:github.state,githubUrl:'url' in github?github.url:null},201);if(visitor.cookie)result.headers.append('Set-Cookie',visitor.cookie);if(visitor.sessionToken)result.headers.set('X-Octamod-Session',visitor.sessionToken);return result
+      // Account reports stay private, even when GitHub credentials are configured.
+      return response({ok:true,author,github:'none',githubUrl:null},201)
     }
     if(path==='/api/issues/mine'&&request.method==='GET'){
       if(!user)return response([])
-      return response((await db.prepare('SELECT id,module_id,author_login,title,body,status,created_at,github_url FROM issues WHERE reporter_id=? ORDER BY created_at DESC LIMIT 100').bind(user.id).all()).results)
+      return response((await db.prepare('SELECT id,module_id,author_login,title,body,status,created_at,github_url,public_sharing FROM issues WHERE reporter_id=? ORDER BY created_at DESC LIMIT 100').bind(user.id).all()).results)
     }
     if (path.startsWith('/api/admin/')) {
       if (!admin) throw new HttpError(403,'Administrator access is required.')
+      if(path==='/api/admin/account-requests'&&request.method==='GET')return response((await db.prepare('SELECT r.id,r.user_id,r.status,r.created_at,r.updated_at,r.review_note,u.username FROM account_removal_requests r JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC,r.rowid DESC LIMIT 100').all()).results)
+      if(path==='/api/admin/account-mail'&&request.method==='GET')return response((await db.prepare('SELECT day,purpose,accepted,failed,limited FROM account_mail_daily ORDER BY day DESC,purpose LIMIT 60').all()).results)
+      if((match=path.match(/^\/api\/admin\/account-requests\/([a-zA-Z0-9-]+)$/))&&request.method==='PATCH')return reviewAccountRequest(request,db,match[1])
       if (path === '/api/admin/insights' && request.method === 'GET') return response(await adminInsights(db))
       if (path === '/api/admin/statistics' && request.method === 'GET') return await usageStatistics(db,Number(url.searchParams.get('days') ?? 7))
       if (path === '/api/admin/overview' && request.method === 'GET') return response(await db.prepare("SELECT (SELECT COUNT(*) FROM submissions WHERE status='pending') AS pending,(SELECT COUNT(*) FROM module_publications) AS published,(SELECT COUNT(*) FROM comments) AS comments,(SELECT COUNT(*) FROM issues WHERE status='open') AS issues,(SELECT COALESCE(SUM(bytes),0) FROM media) AS mediaBytes").first())
@@ -112,7 +120,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
       if (path === '/api/admin/issues' && request.method === 'GET') {
         const moduleId = url.searchParams.has('moduleId') ? required(url.searchParams.get('moduleId'),'Module ID',100) : '', status = url.searchParams.get('status')??'all'
         if (!['all','open','closed'].includes(status)) throw new HttpError(400,'Choose all, open or closed issues.')
-        return response((await db.prepare("SELECT i.id,i.module_id,i.author_login,i.title,i.body,i.status,i.created_at,i.context_json,i.log_missing,i.log_missing_note,i.github_state,i.github_url,i.github_error,l.summary_json AS log_summary_json,u.display_name AS reporter FROM issues i JOIN users u ON u.id=i.reporter_id LEFT JOIN issue_logs l ON l.issue_id=i.id WHERE (?='' OR i.module_id=?) AND (?='all' OR i.status=?) ORDER BY i.created_at DESC,i.rowid DESC LIMIT 200").bind(moduleId,moduleId,status,status).all<Record<string,unknown>&{context_json:string|null;log_summary_json:string|null}>()).results.map(({context_json,log_summary_json,...item})=>({...item,context:context_json?JSON.parse(context_json):null,log:log_summary_json?JSON.parse(log_summary_json):null})))
+        return response((await db.prepare("SELECT i.id,i.module_id,i.author_login,i.title,i.body,i.status,i.created_at,i.context_json,i.log_missing,i.log_missing_note,i.github_state,i.github_url,i.github_error,i.public_sharing,l.summary_json AS log_summary_json,u.display_name AS reporter FROM issues i JOIN users u ON u.id=i.reporter_id LEFT JOIN issue_logs l ON l.issue_id=i.id WHERE (?='' OR i.module_id=?) AND (?='all' OR i.status=?) ORDER BY i.created_at DESC,i.rowid DESC LIMIT 200").bind(moduleId,moduleId,status,status).all<Record<string,unknown>&{context_json:string|null;log_summary_json:string|null}>()).results.map(({context_json,log_summary_json,...item})=>({...item,context:context_json?JSON.parse(context_json):null,log:log_summary_json?JSON.parse(log_summary_json):null})))
       }
       if ((match=path.match(/^\/api\/admin\/issues\/([^/]+)\/log$/)) && request.method === 'GET') {
         const log=await db.prepare('SELECT text FROM issue_logs WHERE issue_id=?').bind(match[1]).first<{text:string}>()

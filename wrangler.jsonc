@@ -2,8 +2,10 @@
   "name": "octamod",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-09-30",
+  "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    "APP_URL": "http://127.0.0.1:5173"
+    "APP_URL": "http://127.0.0.1:5173",
+    "REGISTRATION_OPEN": "false"
   },
   "d1_databases": [
     {

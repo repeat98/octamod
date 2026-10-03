@@ -7,7 +7,7 @@ import type { OtLogSummary } from './ot-log'
 type Issue = {
   id: string; module_id: string; author_login: string; title: string; body: string; status: string; reporter: string
   context: IssueContext | null; log: OtLogSummary | null; log_missing: LogMissingReason | null; log_missing_note: string
-  github_state: 'none' | 'pending' | 'syncing' | 'synced' | 'failed'; github_url: string | null; github_error: string
+  public_sharing: number; github_state: 'none' | 'pending' | 'syncing' | 'synced' | 'failed'; github_url: string | null; github_error: string
 }
 export function IssueInbox({moduleId = '',onClearModule}: {moduleId?: string;onClearModule?: () => void}) {
   const [status,setStatus] = useState(moduleId ? 'open' : 'all')
@@ -29,7 +29,7 @@ export function IssueInbox({moduleId = '',onClearModule}: {moduleId?: string;onC
     } catch (error) { setError(error instanceof Error ? error.message : 'The log could not be downloaded.') }
   }
   return <section className="configuration-section"><div className="section-title"><h2>Author-directed issues</h2><span className="pill">{items.filter(item => item.status === 'open').length} open</span></div>
-    <p className="service-note">With GitHub mirroring configured, every report also opens a public issue labelled <code>module:&lt;id&gt;</code> that mentions the module author. Closing it on GitHub or here updates the reporter’s status. Reports that failed to mirror can be retried.</p>
+    <p className="service-note">New account reports and logs stay private. Previously published reports retain their GitHub links and status synchronization. Private reports cannot be published through retries.</p>
     <div className="statistics-controls inbox-controls"><label>Issue status<select value={status} disabled={!!busy} onChange={event => { setStatus(event.target.value); setLoading(true); setError('') }}><option value="all">All reports</option><option value="open">Open reports</option><option value="closed">Resolved reports</option></select></label>{moduleId && <span className="service-note">Module: {moduleId} <button className="text-button" onClick={onClearModule}>Clear module filter</button></span>}</div>
     {items.length===200 && <p className="service-note">Showing the latest 200 matching reports.</p>}
     {loading ? <p role="status">Loading reports…</p> : items.length ? items.map(item => <article className="inbox-issue" key={item.id}>
@@ -46,7 +46,7 @@ export function IssueInbox({moduleId = '',onClearModule}: {moduleId?: string;onC
       <div className="inbox-actions">
         <button className="text-button" disabled={!!busy} onClick={() => void resolve(item)}>{busy === item.id ? 'Saving…' : item.status === 'open' ? 'Mark resolved' : 'Reopen'}</button>
         {item.log && <button className="text-button" onClick={() => void download(item)}>Download log</button>}
-        {item.github_state !== 'synced' && <button className="text-button" disabled={!!busy} onClick={() => void mirror(item)}>{item.github_state === 'none' ? 'Mirror to GitHub' : 'Retry GitHub'}</button>}
+        {!!item.public_sharing && item.github_state !== 'synced' && <button className="text-button" disabled={!!busy} onClick={() => void mirror(item)}>{item.github_state === 'none' ? 'Mirror to GitHub' : 'Retry GitHub'}</button>}
       </div>
     </article>) : !error && <p className="service-note">No reports match these filters.</p>}{error && <p className="file-error" role="alert">{error}</p>}</section>
 }

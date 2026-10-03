@@ -14,7 +14,7 @@ A separate Cloudflare Worker with D1 serves the initial community backend. R2 re
 
 Keep the HTTP contract independent of the hosting provider. A future self-hosted backend can use SQLite and file/object-storage adapters; these adapters and a self-hosted entry point remain unimplemented. Keep the core experience free of paid dependencies and within initial hosting free-tier constraints.
 
-Cross-origin guest requests use an opaque device session in a bearer header, without third-party cookies. CORS and mutations are restricted to the configured frontend origin. No session token appears in a URL. See [app development and operations](APP_DEVELOPMENT.md) for setup.
+Cross-origin account requests use a signed session in a bearer header, without third-party cookies. CORS and mutations are restricted to the configured frontend origin. No session token appears in a URL. See [app development and operations](APP_DEVELOPMENT.md) for setup.
 
 ## Local firmware and build qualification
 
@@ -38,13 +38,19 @@ The eleven current module versions and complete folder fingerprints are retained
 
 Require original or properly licensed sources and media, attribution, contributor declarations and reviewer verification. Distinguish illustrations, emulator evidence and hardware results. Review is not automatic legal clearance. See [contribution rules](../CONTRIBUTING.md).
 
-## Guest community and private administration
+## Registered community and private administration — 3 October 2026
 
-Comments, reviews, ratings, likes and author-directed issues require no visitor account or email. GitHub authentication is used on GitHub itself for pull requests; Octamod has no website GitHub sign-in.
+The owner superseded the earlier guest-only/no-email decision: public reading stays account-free, while threads, replies, comments, ratings, likes and issue reports require a verified email account. Better Auth provides password hashing, verification, recovery and revocable sessions behind a restricted API facade. GitHub authentication stays on GitHub itself for pull requests.
+
+The forum has general discussion, module help, public bug reports and immutable shared configuration snapshots. Existing private issue reports remain private and are never migrated by matching display names. New accounts cannot claim historical guest content. Config snapshots contain only named module selections, versions and chooser settings; firmware stays local.
+
+Keep octamod.app registered at Hetzner. Domain registration alone does not provide a transactional mail service. Resend is the initial mail adapter for verification/recovery only, with secrets in the Worker and DNS verification at the registrar. This change does not authorize DNS edits or deployment. See [forum operation and security](FORUM.md).
 
 Administration uses separate server-side authorization. Every administrator route must reject access without valid backend authorization. Moderation history remains private; reporters can list only their own reports on the site. Do not expose private routes or use frontend-only access checks.
 
 On 3 October 2026 the owner chose to mirror issue reports to public GitHub issues so module authors see and answer them directly. Before that, reports were private and passed on by the administrator. The owner also chose to require the on-device `OCTAMOD.LOG` in reports, with an explicit stated-reason escape (for example, a unit that does not boot), and a step-by-step tutorial in the form. Reports carry structured configuration context. The form tells reporters that their name, report, module list and log are public. Logs must pass the strict OCTAMOD.LOG grammar; binary firmware and arbitrary file attachments are rejected. Authors still need no website sign-in: GitHub provides identity and notifications. The owner clarified that the [logger](../sdk/runtime/logging/README.md) is mandatory core infrastructure in every composed build, never a module or catalog entry. Logging uses bounded RAM records and throttled card checkpoints. The owner subsequently explicitly approved all current module versions and the logger for release, lifted the logger addition’s qualification restrictions, authorized firmware/DSP testing here and waived hardware testing. Keep the logger in downloadable builds, preserve lightweight build rejection/integrity checks, and report unmeasured timing and hardware limits honestly. This exception applies to this logger addition; it does not expand module qualification baselines or authorize firmware redistribution.
+
+The account/forum draft preserves structured reports and strict device-log validation but keeps new account reports private. It grants no GitHub publication permissions and blocks private-report retries; previously published GitHub links and status synchronization are retained. Re-enabling public mirroring requires a separately reviewed consent workflow. This limitation follows the automatic approval review during forum integration, not a new owner decision.
 
 ## Catalog scope and pins
 
