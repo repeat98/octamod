@@ -1,0 +1,218 @@
+{
+  "firmware": "1.40C",
+  "imageSha256": "48f3be3af84c64b51d22bf7047a44609a5f59a85c5b875d4474aef8a791a98b9",
+  "emulatorSha256": "93484e4b71c70f48f795825103146a36ef95ef9ac06ee627e28608ae3e3bb3eb",
+  "setup": "Headless ot_emu; MKII panel; stopped transport; 128\u00d764 LCD at integer scale 6. Fresh scratch card; initial Part ONE / pattern A01; no samples or existing project loaded; stock FX plus STANG 2. UI only; no audio or saved-project qualification.",
+  "palette": {
+    "on": [
+      240,
+      240,
+      240
+    ],
+    "off": [
+      24,
+      24,
+      24
+    ]
+  },
+  "keyMs": 150,
+  "plan": [
+    {
+      "wait": 3000
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "wait": 1000
+    },
+    {
+      "press": [
+        "NO"
+      ]
+    },
+    {
+      "press": [
+        "T1"
+      ]
+    },
+    {
+      "press": [
+        "FUNC",
+        "SRC"
+      ]
+    },
+    {
+      "press": [
+        "DOWN"
+      ]
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "press": [
+        "SRC"
+      ]
+    },
+    {
+      "press": [
+        "FUNC",
+        "SRC"
+      ]
+    },
+    {
+      "press": [
+        "DOWN"
+      ]
+    },
+    {
+      "press": [
+        "DOWN"
+      ]
+    },
+    {
+      "press": [
+        "DOWN"
+      ]
+    },
+    {
+      "press": [
+        "DOWN"
+      ]
+    },
+    {
+      "capture": "ot-location.png"
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "press": [
+        "SRC"
+      ]
+    },
+    {
+      "wait": 500
+    },
+    {
+      "capture": "ot-generator.png"
+    },
+    {
+      "encoder": {
+        "name": "B",
+        "delta": 3
+      }
+    },
+    {
+      "press": [
+        "YES"
+      ]
+    },
+    {
+      "wait": 500
+    },
+    {
+      "capture": "ot-generated.png"
+    },
+    {
+      "press": [
+        "PUSH LEVEL"
+      ]
+    },
+    {
+      "wait": 500
+    },
+    {
+      "capture": "ot-edit.png"
+    },
+    {
+      "press": [
+        "REC"
+      ]
+    },
+    {
+      "hold": [
+        "TRIG1"
+      ]
+    },
+    {
+      "release": [
+        "TRIG1"
+      ]
+    },
+    {
+      "press": [
+        "REC"
+      ]
+    },
+    {
+      "press": [
+        "FUNC",
+        "SRC"
+      ]
+    },
+    {
+      "capture": "ot-setup.png"
+    }
+  ],
+  "screenshots": {
+    "ot-location.png": "2a9623f81ba497e948783fa217d6f8e59f53740c42860926d7565c6abe4c1d50",
+    "ot-generator.png": "b602dd2b5280cc441e45011438db2162919bdc75a48994667713cb3ae535b0ee",
+    "ot-generated.png": "4973306fc798380260203c71624987297c85ee83225818aa55f761cf3e7f18b3",
+    "ot-edit.png": "7ddbbcafa2d5d3df507b870ede06ddb0f7c78111e673e68160dcbb2a630ab3fa",
+    "ot-setup.png": "1ef48a03ce56eb86efc9ae893f75b1dc1324d45e9c7191a7101ee3c615d9ee7f"
+  },
+  "schemaVersion": 1,
+  "captured": "2026-10-03",
+  "moduleId": "stang-2",
+  "moduleVersion": "0.1.0-experimental",
+  "capturedDraftVersion": "0.1.0-experimental",
+  "captureToolSha256": "8122aa8d33ef7e709f81b1f3d94f3aaff7560cf59038b5fdeeae891cf279d397",
+  "toolSourceRevision": "56f3f936207b7bae53842bfe5293acb2ff8e6f3f",
+  "compiler": "m68k-elf-gcc (GCC) 16.2.0",
+  "baseSha256": "164f31224bf61181e3f50e7dec40df9afcae5b16dbf6e4c0d0cc5e986af0a84e",
+  "isolation": "macOS sandbox-exec; default deny; no network or credentials; clean environment; source/toolchain reads and task-private writes only.",
+  "imageProfile": {
+    "modules": [
+      "STANG 2"
+    ],
+    "fx1": [
+      "FILTER",
+      "EQUALIZER",
+      "DJ EQ",
+      "PHASER",
+      "FLANGER",
+      "CHORUS",
+      "SPATIALIZER",
+      "COMB FILTER",
+      "COMPRESSOR",
+      "LO-FI"
+    ],
+    "platformModules": [],
+    "staticStock": true,
+    "XBUS": 1,
+    "SPEC": 1,
+    "DEV": 0,
+    "NOROUNDTRIP": 0,
+    "BUILD": 79
+  },
+  "reviewed": "All seven raw screenshots visually inspected. Five selected; redundant density and held-trig frames omitted. No failed-load/error screen accepted. No RAM manipulation or internal menu invocation.",
+  "limitations": "Stopped UI capture only: confirms chooser, six SRC controls, density editing, Generate status, native edit toggle and SRC SETUP. Does not prove trig audio, first PLAY dispatch, saved persistence, hardware timing, memory bounds or full native writer ABI.",
+  "nativeBuildInputs": {
+    "engine.c": "6a8d8c8b9e64af76ed0591c543fa7701764b6c4b03cf73c9751742610a9aaa9c",
+    "engine.h": "da5f3576f33d9f18b79bff67c41ba1e950bdd3302c00c2f13f73e56ab6934cbd",
+    "native.c": "9b9f8da2dfb9999a6b62b6c31bdace9badc95ea3d5a1d38094c18ecdc128cafb",
+    "hooks.s": "83a7d92a328cedbbba3a0e9740763529fc385227b0effdf2795796bb38f2f12a",
+    "prepare.py": "869ff54250200c28ae6c08967e0f84acb988d4159adf81eb0aeb1d553c4466c7",
+    "manifest.py": "ab36c653edabe37b1f871042cce65bc8f177402b7c7943acc502c2c99a7278ad"
+  },
+  "sourceSha256": "3c6b7079b0d8b065a61652c092b11f295813e9af97de682dc03b2ce09b43470a",
+  "sourceRevision": "ce3e5d469c4c0e659a07c9ae63849d8acc66afd2"
+}

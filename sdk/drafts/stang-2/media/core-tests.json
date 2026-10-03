@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "moduleVersion": "0.1.0-experimental",
+  "testedOn": "2026-10-03",
+  "compiler": "Apple clang version 21.0.0",
+  "isolation": "macOS sandbox-exec; no network/credentials; task-private output; no firmware used.",
+  "command": "clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined engine.c test_engine.c -o test-engine && ./test-engine",
+  "cases": 244800,
+  "result": "passed",
+  "sanitizers": [
+    "address",
+    "undefined"
+  ],
+  "writerChecks": [
+    "empty-only auto generation",
+    "no overwrite of existing notes, trigless edits, recorder masks, slide marks or locks",
+    "exact native swing mask, length, scale and swing value preservation",
+    "recorder / sample / FX / LFO lock preservation",
+    "fail-before-write on invalid phrase",
+    "buffer boundaries and seed wrap"
+  ],
+  "sources": {
+    "engine.c": "6a8d8c8b9e64af76ed0591c543fa7701764b6c4b03cf73c9751742610a9aaa9c",
+    "engine.h": "da5f3576f33d9f18b79bff67c41ba1e950bdd3302c00c2f13f73e56ab6934cbd",
+    "test_engine.c": "4a3135720394f606b9c4a8d71f60bba50d10d73408813b2206073da6c422875a"
+  },
+  "limitations": "Synthetic host buffers only; not native transport, audio, persistence, timing, firmware/DSP stress or hardware qualification.",
+  "sourceRevision": "ce3e5d469c4c0e659a07c9ae63849d8acc66afd2"
+}

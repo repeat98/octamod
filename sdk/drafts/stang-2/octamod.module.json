@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 2,
+  "id": "stang-2",
+  "key": "STANG 2",
+  "name": "Stang 2",
+  "version": "0.1.0-experimental",
+  "category": "machines",
+  "author": {
+    "github": "repeat98",
+    "credits": [
+      "Octamod contributors: original generator and integration",
+      "Sam Banks / octabam: MIT native UI and registration seams",
+      "Iftah: Sting 2 musical inspiration; no source or assets copied"
+    ]
+  },
+  "nativeManifest": "manifest.py",
+  "presentation": {
+    "label": "GENERATIVE",
+    "family": "Sample pattern generator",
+    "summary": "Generate an editable sample phrase from the SRC page.",
+    "overview": "Stang 2 writes real trigs and pitch, HOLD and volume locks for a single Flex or Static sample. The phrase repeats under the native sequencer and swing grid until an explicit Generate request. This is an unqualified source draft.",
+    "highlights": [
+      "Six generation knobs on SRC",
+      "Real editable trigs and note locks",
+      "Native track speed and swing; no separate clock",
+      "Flex or Static sample playback"
+    ],
+    "usage": [
+      "Select an audio track. Choose FLEX or STATIC in FUNC+SRC, load one tuned sample from that pool, then reopen FUNC+SRC, move DOWN to STANG 2 and press YES. Stang keeps the selected pool and sample.",
+      "Press SRC to show TYPE, DENS, ROOT, SCALE, GATE and ACCNT on encoders A–F. Start with TYPE 11, DENS 11, ROOT C, SCALE MIN, GATE 32 and ACCNT 48. Use the normal scale menu for pattern/track length, speed and swing.",
+      "On an empty track, press PLAY to request the first phrase automatically. The intended playback uses real sequencer trigs and PTCH/HOLD/VOL locks and then repeats. A track with existing trigs, locks or recorder events is left alone. Native transport/audio behavior is not qualified yet.",
+      "Press LEVEL to switch from the generator to ordinary SRC editing. Enable grid recording, hold a trig and turn PTCH to edit a note. AMP exposes its generated HOLD/VOL locks. Press LEVEL on SRC again to return to generation.",
+      "Press YES in the generator to replace the current track’s musical phrase. While playing, the draft queues this until STOP; changing bank, Part, pattern or track cancels it. STOP/PLAY otherwise preserves the phrase and edits. Select normal FLEX/STATIC to remove Stang while retaining the generated pattern."
+    ]
+  },
+  "controls": [
+    {
+      "name": "TYPE",
+      "default": 11,
+      "count": 16,
+      "doc": "0–15. Low values favor varied scale notes; higher values prefer tonic/fifth and stronger beat positions. Original algorithm; not a byte-identical Sting port.",
+      "labels": null
+    },
+    {
+      "name": "DENS",
+      "default": 11,
+      "count": 17,
+      "doc": "0–16. Note count is round(length × DENS / 16). Zero is silence; 16 fills the active length. Changes take effect on Generate.",
+      "labels": null
+    },
+    {
+      "name": "ROOT",
+      "default": 0,
+      "count": 12,
+      "doc": "C–B. Sample reference is C at neutral PTCH. Tune the source sample accordingly. Pitch locks stay within −12 to +12 semitones.",
+      "labels": [
+        "C",
+        "C#",
+        "D",
+        "D#",
+        "E",
+        "F",
+        "F#",
+        "G",
+        "G#",
+        "A",
+        "A#",
+        "B"
+      ]
+    },
+    {
+      "name": "SCALE",
+      "default": 1,
+      "count": 5,
+      "doc": "Chromatic, natural minor, major, Dorian or minor pentatonic. All generated pitches remain in the selected scale.",
+      "labels": [
+        "CHR",
+        "MIN",
+        "MAJ",
+        "DOR",
+        "PENT"
+      ]
+    },
+    {
+      "name": "GATE",
+      "default": 32,
+      "count": 127,
+      "doc": "0–126 in native AMP HOLD units, not percent or milliseconds. Generated HOLD locks range from half to all of this value. AMP REL still shapes the audible tail.",
+      "labels": null
+    },
+    {
+      "name": "ACCNT",
+      "default": 48,
+      "count": 128,
+      "doc": "0–127. Strong notes keep the Part AMP VOL. Other notes are attenuated by up to half; zero gives equal volumes. This writes AMP VOL locks, not MIDI velocity.",
+      "labels": null
+    }
+  ],
+  "compatibility": {
+    "firmware": "1.40C",
+    "effectId": null,
+    "location": "Track machine",
+    "conflicts": [
+      "analog-bassdrum"
+    ],
+    "limitations": [
+      "Draft: not flashable or available in the configurator.",
+      "MKI/MKII hardware support is unverified; documentation captures use the MKII emulator panel.",
+      "Shares chooser/UI hook sites with Analog BD; composition must reject that overlap. OctaKit and other integrations are unverified.",
+      "Sample must be tuned to the stated C reference. Generated pitch is limited to the native ±12-semitone range.",
+      "Regeneration during playback waits for STOP in this draft. Quantized live replacement and Undo are not implemented.",
+      "Uses the native pattern/track length and swing controls; no independent LENGTH, clock, swing or MIDI output.",
+      "SRC generation knobs are request parameters, not p-lock/LFO/scene destinations. The normal EDIT view retains native playback controls.",
+      "Generated phrase owns note trigs, PTCH/HOLD/VOL locks and note timing/conditions. Explicit Generate replaces those across the current track; other locks, recorder events and swing are preserved.",
+      "The DRAM loader reserves 1,707 audio pages (10,487,808 bytes) shared across DRAM modules."
+    ]
+  },
+  "resources": {
+    "recorded": "2026-10-03; source estimate and isolated compilation only",
+    "storage": {
+      "label": "Storage",
+      "display": "Not measured",
+      "value": null,
+      "unit": "unknown",
+      "method": "unmeasured",
+      "conditions": "Native source draft; complete worst-case qualification is not measured. See TESTING.md.",
+      "source": "TESTING.md"
+    },
+    "processing": {
+      "label": "CPU / DSP load",
+      "display": "Not measured",
+      "value": null,
+      "unit": "unknown",
+      "method": "unmeasured",
+      "conditions": "Native source draft; complete worst-case qualification is not measured. See TESTING.md.",
+      "source": "TESTING.md"
+    },
+    "impact": {
+      "conditions": "One requested 1–64-step phrase; up to eight Stang tracks. Generation runs on request while stopped. Stock Flex/Static playback and DSP are retained; no utilization/headroom percentage is asserted.",
+      "cpu": {
+        "level": "low",
+        "basis": "source-estimate",
+        "rationale": "Bounded 64-step integer generation (at most 2016 rank comparisons), a staged track write and UI drawing. No added per-sample DSP loop; native event cost still unmeasured.",
+        "source": "TESTING.md"
+      },
+      "dsp": {
+        "level": "minimal",
+        "basis": "source-estimate",
+        "rationale": "No added DSP kernel. Generated note density still changes ordinary sample/FX workload, which must be stress-tested.",
+        "source": "TESTING.md"
+      },
+      "memory": {
+        "level": "high",
+        "basis": "source-estimate",
+        "rationale": "Small original state/phrase buffers, but the current shared platform loader reserves 10,487,808 audio-pool bytes. Full code/stack/window allocation and maximum-instance accounting are pending.",
+        "source": "TESTING.md"
+      }
+    }
+  },
+  "tests": {
+    "report": "TESTING.md",
+    "summary": "Firmware-free core passed 244,800 deterministic/scale/density cases and native-record writer invariants under ASan/UBSan. Local UI capture is separate; native audio, first-PLAY timing, persistence, exact cycle/memory and hardware qualification remain pending.",
+    "hardwareStatus": "untested",
+    "evidenceRevision": "ce3e5d469c4c0e659a07c9ae63849d8acc66afd2",
+    "gates": [
+      "Firmware-free deterministic generator and native-record safety tests",
+      "Actual native LCD chooser, SRC generator and edit-view capture",
+      "Native first-PLAY, repeat, editor/persistence and swing equivalence verification (pending)",
+      "Worst-case cycle and complete memory qualification (pending)",
+      "60 minutes of real hardware stress with all eight audio tracks active (pending)",
+      "Owner review and browser/native parity and rejection checks (pending)"
+    ]
+  },
+  "license": {
+    "spdx": "MIT",
+    "file": "LICENSE",
+    "declaration": "Original Stang 2 C generator, tests, documentation and vector illustration by Octamod contributors. Native registration/input-layer interoperability is adapted from MIT octabam; Sam Banks and existing component notices are retained. Iftah’s Sting 2 is musical inspiration; no Sting source, branding artwork or assets were copied and no exact algorithm or endorsement is claimed. Firmware and extracted routines are excluded; replay bytes are reconstructed only from verified local firmware into temporary build output. Actual LCD images require reviewer rights verification under media/LICENSE.md; review is not automatic legal clearance."
+  },
+  "media": [
+    {
+      "path": "media/ot-location.png",
+      "captureType": "emulator",
+      "caption": "Choose STANG 2 after selecting the Flex or Static backing pool.",
+      "alt": "Actual monochrome machine chooser with STANG 2 selected beneath PICKUP.",
+      "credit": "Octamod contributors",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "SRC SETUP machine chooser",
+        "shows": "location",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "48f3be3af84c64b51d22bf7047a44609a5f59a85c5b875d4474aef8a791a98b9",
+        "setup": "Headless ot_emu; MKII panel; stopped transport; 128×64 LCD at integer scale 6. Fresh scratch card; initial Part ONE / pattern A01; no samples or existing project loaded; stock FX plus STANG 2. UI only; no audio or saved-project qualification."
+      }
+    },
+    {
+      "path": "media/ot-generator.png",
+      "captureType": "emulator",
+      "caption": "SRC exposes TYPE, DENS, ROOT, SCALE, GATE and ACCNT on encoders A–F.",
+      "alt": "Actual Stang 2 SRC page: FLEX, TYPE 11, DENS 11, ROOT C, SCALE MIN, GATE 32, ACCNT 48.",
+      "credit": "Octamod contributors",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "SRC generator",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "48f3be3af84c64b51d22bf7047a44609a5f59a85c5b875d4474aef8a791a98b9",
+        "setup": "Headless ot_emu; MKII panel; stopped transport; 128×64 LCD at integer scale 6. Fresh scratch card; initial Part ONE / pattern A01; no samples or existing project loaded; stock FX plus STANG 2. UI only; no audio or saved-project qualification."
+      }
+    },
+    {
+      "path": "media/ot-generated.png",
+      "captureType": "emulator",
+      "caption": "Encoder B changes DENS to 14; YES reports GENERATED while transport remains stopped.",
+      "alt": "Actual Stang 2 SRC page with DENS 14 and GENERATED status.",
+      "credit": "Octamod contributors",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "SRC after Generate",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "48f3be3af84c64b51d22bf7047a44609a5f59a85c5b875d4474aef8a791a98b9",
+        "setup": "Headless ot_emu; MKII panel; stopped transport; 128×64 LCD at integer scale 6. Fresh scratch card; initial Part ONE / pattern A01; no samples or existing project loaded; stock FX plus STANG 2. UI only; no audio or saved-project qualification."
+      }
+    },
+    {
+      "path": "media/ot-edit.png",
+      "captureType": "emulator",
+      "caption": "Push LEVEL to access native PTCH, STRT, LEN, RATE, RTRG and RTIM.",
+      "alt": "Actual native SRC page labelled STANG 2 with the six normal sample controls.",
+      "credit": "Octamod contributors",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "SRC sample editor",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "48f3be3af84c64b51d22bf7047a44609a5f59a85c5b875d4474aef8a791a98b9",
+        "setup": "Headless ot_emu; MKII panel; stopped transport; 128×64 LCD at integer scale 6. Fresh scratch card; initial Part ONE / pattern A01; no samples or existing project loaded; stock FX plus STANG 2. UI only; no audio or saved-project qualification."
+      }
+    },
+    {
+      "path": "media/ot-setup.png",
+      "captureType": "emulator",
+      "caption": "FUNC+SRC retains the native sample setup controls for the backing pool.",
+      "alt": "Actual SRC SETUP LCD with STANG 2 selected and LOOP, SLIC, LEN, RATE, TSTR and TSNS controls.",
+      "credit": "Octamod contributors",
+      "license": "LicenseRef-OT-UI-Documentation",
+      "source": "original",
+      "otUi": {
+        "page": "SRC SETUP",
+        "shows": "controls",
+        "firmware": "1.40C",
+        "moduleVersion": "0.1.0-experimental",
+        "imageSha256": "48f3be3af84c64b51d22bf7047a44609a5f59a85c5b875d4474aef8a791a98b9",
+        "setup": "Headless ot_emu; MKII panel; stopped transport; 128×64 LCD at integer scale 6. Fresh scratch card; initial Part ONE / pattern A01; no samples or existing project loaded; stock FX plus STANG 2. UI only; no audio or saved-project qualification."
+      }
+    }
+  ],
+  "access": {
+    "location": "Audio track machine chooser: STANG 2. SRC shows generation; push LEVEL toggles normal SRC editing.",
+    "steps": [
+      "Select an audio track. Choose FLEX or STATIC in FUNC+SRC, load one tuned sample from that pool, then reopen FUNC+SRC, move DOWN to STANG 2 and press YES. Stang keeps the selected pool and sample.",
+      "Press SRC to show TYPE, DENS, ROOT, SCALE, GATE and ACCNT on encoders A–F. Start with TYPE 11, DENS 11, ROOT C, SCALE MIN, GATE 32 and ACCNT 48. Use the normal scale menu for pattern/track length, speed and swing.",
+      "On an empty track, press PLAY to request the first phrase automatically. The intended playback uses real sequencer trigs and PTCH/HOLD/VOL locks and then repeats. A track with existing trigs, locks or recorder events is left alone. Native transport/audio behavior is not qualified yet.",
+      "Press LEVEL to switch from the generator to ordinary SRC editing. Enable grid recording, hold a trig and turn PTCH to edit a note. AMP exposes its generated HOLD/VOL locks. Press LEVEL on SRC again to return to generation.",
+      "Press YES in the generator to replace the current track’s musical phrase. While playing, the draft queues this until STOP; changing bank, Part, pattern or track cancels it. STOP/PLAY otherwise preserves the phrase and edits. Select normal FLEX/STATIC to remove Stang while retaining the generated pattern."
+    ],
+    "screenshots": [
+      "media/ot-location.png",
+      "media/ot-generator.png",
+      "media/ot-generated.png",
+      "media/ot-edit.png",
+      "media/ot-setup.png"
+    ]
+  },
+  "source": {
+    "repository": "https://github.com/repeat98/octamod",
+    "revision": "ce3e5d469c4c0e659a07c9ae63849d8acc66afd2",
+    "path": "sdk/drafts/stang-2"
+  },
+  "build": {
+    "status": "pending",
+    "reason": "Source draft outside native discovery and the public catalog. Requires native transport/persistence verification, exact cycle/memory reports, 60-minute eight-track hardware stress evidence, browser/native integration and owner review."
+  }
+}

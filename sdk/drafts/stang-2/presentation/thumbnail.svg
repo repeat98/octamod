@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="192" viewBox="0 0 320 192" role="img" aria-labelledby="title desc">
+ <title id="title">Stang 2 — generate, play, edit</title>
+ <desc id="desc">Six controls feed a sixteen-step phrase. Active notes have different pitches; a loop returns to the start. Original illustration, not an Octatrack LCD capture.</desc>
+ <rect width="320" height="192" rx="8" fill="#111218"/>
+ <g stroke="#fff" opacity=".035" stroke-width=".7"><path d="M20 52H300M20 97H300M20 142H300M64 33V163M128 33V163M192 33V163M256 33V163"/></g>
+ <g fill="none" stroke="#929bff" stroke-width="1.7" opacity=".55">
+  <circle cx="54" cy="42" r="9"/><circle cx="96" cy="42" r="9"/><circle cx="138" cy="42" r="9"/><circle cx="180" cy="42" r="9"/><circle cx="222" cy="42" r="9"/><circle cx="264" cy="42" r="9"/>
+  <path d="M54 43l5-5M96 43v-6M138 43l-5-5M180 43l6 1M222 43l3-6M264 43l-6-1M54 60v9h210V60M159 69v12"/>
+ </g>
+ <g stroke="#929bff" stroke-width="2.3" fill="none"><path d="M25 123h15V105h17v18h17v-9h17v-19h17v28h17v-38h17v38h17v-9h17v9h17V95h17v28h17v-18h17v18h17v-9h17v9h17"/><path d="M293 131v16H25v-10m-5 5 5-5 5 5" opacity=".5"/></g>
+ <g fill="#929bff"><rect x="25" y="126" width="11" height="4"/><rect x="42" y="126" width="11" height="4"/><rect x="76" y="126" width="11" height="4"/><rect x="93" y="126" width="11" height="4"/><rect x="127" y="126" width="11" height="4"/><rect x="161" y="126" width="11" height="4"/><rect x="195" y="126" width="11" height="4"/><rect x="229" y="126" width="11" height="4"/><rect x="263" y="126" width="11" height="4"/></g>
+ <text x="25" y="22" font-family="Arial,sans-serif" font-size="10" fill="#c5c7da" letter-spacing="1.1">STANG 2</text>
+ <text x="25" y="176" font-family="Arial,sans-serif" font-size="9" fill="#9b9fb5" letter-spacing=".4">GENERATE → PLAY → EDIT</text>
+ <text x="257" y="176" font-family="Arial,sans-serif" font-size="9" fill="#929bff">16 STEPS</text>
+</svg>

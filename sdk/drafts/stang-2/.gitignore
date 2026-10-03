@@ -1,0 +1,6 @@
+# Local preparation output contains stock-derived replay bytes.
+runtime.s
+*.o
+*.elf
+*.bin
+*.su
