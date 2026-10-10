@@ -132,12 +132,53 @@ DSP_EDITS = {
                    'static void advance(void) {\n'
                    '    if(!phase && queued_token) { uint32_t t=queued_token; queued_token=0; begin(queued_ids,t,0); }\n'
                    '    if(!phase) return;'),
+                  # What needs no DSP job (a Part change within the preloaded set) is ready at once, so the
+                  # stock Part change runs in the same tick, as on stock.
                   ('    if(phase) return DL_SELECT_UNAVAILABLE;\n'
                    '    for(unsigned i=0;i<8;++i) if(s->target_source[i]>4) return DL_SELECT_UNAVAILABLE;\n'
-                   '    begin(s->target,token,0);',
+                   '    begin(s->target,token,0); advance(); return result;',
                    '    for(unsigned i=0;i<8;++i) if(s->target_source[i]>4) return DL_SELECT_UNAVAILABLE;\n'
                    '    if(phase) { bytes(queued_ids,s->target,16); queued_token=token; return DL_SELECT_WAIT; }\n'
-                   '    begin(s->target,token,0);'),
+                   '    begin(s->target,token,0);\n'
+                   '    for(unsigned n=0;n<4 && phase && phase!=5 && !waiting;++n) advance();\n'
+                   '    return result;'),
+                  # Preload the union of the bank's Parts: every transaction also holds the modules the four Parts
+                  # name (allocator.c's keep; stock effects load as the target selects them), and the observer
+                  # reloads when that changes (a project or bank load, a Part edit). Memory is admitted over the
+                  # union, cycles over the target, which is one Part.
+                  ('static unsigned observed_valid=0;',
+                   'static unsigned observed_valid=0;\nstatic uint32_t observed_held[2]={0,0}; /* parts() when last observed */'),
+                  ('static unsigned needed(unsigned index,unsigned mode) {',
+                   '/* The module effects the current bank\'s four Parts name, per core (keep), and those ids names (named). */\n'
+                   'extern const uint32_t modwerk_dsp_modules;\n'
+                   'static void parts(const uint8_t ids[16],uint32_t keep[2],uint32_t named[2]) {\n'
+                   '    uint32_t bank=*(volatile uint32_t *)0x46c82456u;\n'
+                   '    keep[0]=keep[1]=named[0]=named[1]=0;\n'
+                   '    for(unsigned n=0;n<5;++n) for(unsigned i=0;i<16;++i) {\n'
+                   '        unsigned p=n==4 ? ids[i] : bank ? *(volatile uint8_t *)(uintptr_t)(bank+0x8ed80u+n*6322u+i) : 255u;\n'
+                   '        if(p>=32 || !(modwerk_dsp_modules>>p&1u) || dl_catalog[p].resident || !(dl_catalog[p].slots&(i<8 ? 1u:2u))) continue;\n'
+                   '        (n==4 ? named : keep)[(i&7)<4 ? 1:0]|=1u<<p;\n'
+                   '    }\n'
+                   '}\n'
+                   'static unsigned needed(unsigned index,unsigned mode) {'),
+                  # A target naming a module no Part holds yet must fit beside all of them; anything else that does
+                  # not (a bank that never fitted) falls back to loading what it runs.
+                  ('        int r=dl_allocator_prepare(&allocator,desired,current);\n',
+                   '        uint32_t named[2];\n'
+                   '        parts(desired,allocator.keep,named);\n'
+                   '        int r=dl_allocator_prepare(&allocator,desired,current);\n'
+                   '        if((r==DL_ALLOC_MEMORY || r==DL_ALLOC_TRANSITION) && (allocator.keep[0]|allocator.keep[1]) &&\n'
+                   '           (automatic || !((named[0]&~allocator.keep[0])|(named[1]&~allocator.keep[1])))) {\n'
+                   '            allocator.keep[0]=allocator.keep[1]=0;\n'
+                   '            r=dl_allocator_prepare(&allocator,desired,current);\n'
+                   '        }\n'),
+                  ('    for(unsigned i=0;i<16;++i) if(ids[i]!=observed[i]) changed=1;\n    if(!changed) return;',
+                   '    for(unsigned i=0;i<16;++i) if(ids[i]!=observed[i]) changed=1;\n'
+                   '    uint32_t held[2],named[2];\n'
+                   '    parts(ids,held,named);\n'
+                   '    if(held[0]!=observed_held[0] || held[1]!=observed_held[1]) changed=1;\n'
+                   '    observed_held[0]=held[0]; observed_held[1]=held[1];\n'
+                   '    if(!changed) return;'),
                   ('    if(token!=current) return DL_SELECT_UNAVAILABLE;\n    advance(); return result;',
                    '    if(token!=current && token!=queued_token) return DL_SELECT_UNAVAILABLE;\n'
                    '    advance(); return token==current ? result : DL_SELECT_WAIT;'),
@@ -155,7 +196,17 @@ DSP_EDITS = {
                      '        uint32_t cost=a->catalog[p].cycles;\n'
                      '        if(cost>a->allowance[c]-overlap[c]) return DL_ALLOC_CYCLES;\n'
                      '        overlap[c]+=cost;\n'
-                     '    }\n', '')),
+                     '    }\n', ''),
+                    # Place what keep holds on a core after the target's own ids (manager.c's union of Parts).
+                    ('    for(unsigned i=0;i<16;++i) {\n'
+                     '        unsigned p=ids[i];\n'
+                     '        if(core_of(i)!=c || p==DL_NONE || a->catalog[p].resident || a->target[c][p].present) continue;',
+                     '    for(unsigned i=0;i<16+DL_PACKAGES;++i) {\n'
+                     '        unsigned p=i<16 ? (core_of(i)==c ? ids[i] : DL_NONE) : (a->keep[c]>>(i-16)&1u ? i-16 : DL_NONE);\n'
+                     '        if(p==DL_NONE || a->catalog[p].resident || a->target[c][p].present) continue;')),
+    'allocator.h': (('    uint8_t phase, required, ready;\n};',
+                     '    uint8_t phase, required, ready;\n'
+                     '    uint32_t keep[2]; /* Modwerk: more ids to place per core, beside the target\'s own */\n};'),),
     # No reads from a DSP (dsp_receiver.asm says why): the receiver answers in the host flags, an upload
     # carries its sum for the receiver to check, and each core's table is the build's (dsp_loader.py).
     # eDMA channel 0 keeps stock's ATTR, which reads its source in 16-byte bursts: an unaligned source

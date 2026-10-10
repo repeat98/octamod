@@ -21,7 +21,10 @@
 // (the load meter's last window read back; the emulator's timing, so the plumbing only), beside (the module on T1
 // and T5, FX2 where it has a row, FX1 on T5 when it has both, then PLATE REV on T2 and DARK REV on T6: every effect
 // each core runs is bound in its arena, the module word for word), queue (the module on T1, then on T5, on T6 and
-// FILTER on T6 on the next ticks, while T1's upload runs: they wait, the latest per slot, and none is dropped).
+// FILTER on T6 on the next ticks, while T1's upload runs: they wait, the latest per slot, and none is dropped),
+// union (more modules as SECOND, comma-separated, a last argument to drive: what an inactive Part names is
+// preloaded, a Part change to it sends nothing to the DSPs, and a pick of the module that the union of Parts cannot
+// hold is refused although nothing live holds the others).
 // SCENARIO:MODULE names the module by its catalogue id (src/engine/assets/dsp-packages.json); E-Verb by default.
 // The card needs a project whose Part 1 has no module effect on T1, T2, T5 or T6.
 // Emulator evidence only: executed instructions, no hardware timing or audio.
@@ -58,7 +61,7 @@ if (mode === 'dumps') {
     `0x${LIVE_FX.toString(16)},16=${out}/ids.bin`]
   console.log(`--mem-dump ${dumps.join(';')} --dsp-peek 0:X:215,64;1:X:215,64;0:P:${layout.A.table.slice(2)},${parseInt(layout.A.tableWords, 16)};1:P:${layout.B.table.slice(2)},${parseInt(layout.B.tableWords, 16)}`)
 } else if (mode === 'drive') {
-  const [socket, dir, , file] = args, { proofs, symbols } = build(dir)
+  const [socket, dir, , file, second] = args, { proofs, symbols } = build(dir)
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
   const bench = new Bench(socket, { timeoutMs: 600000 }); await bench.ready()
   const index = findVendorInterface(await enumerate(bench, false))
@@ -95,17 +98,19 @@ if (mode === 'dumps') {
   }
   const data = new Uint8Array(readFileSync(file)), id = new DataView(data.buffer).getUint32(28)
   // Emulator-only reads: a three-instruction routine in the unused end of the boot stage returns a long.
-  const at = symbols.modwerk_boot_stage + 0x130000, long = async address => {
+  const at = symbols.modwerk_boot_stage + 0x130000, hex = n => n.toString(16), long = async address => {
     await bench.command(`poke 0x${at.toString(16)} 2079${address.toString(16).padStart(8, '0')}20084e75`) // movea.l (addr).l,a0; move.l a0,d0; rts
-    return (await call(at)) >>> 0
+    const value = (await call(at)) >>> 0
+    await settle(5) // ot_emu serves the next poke once its run loop has turned again
+    return value
   }
+  const byte = async address => ((await long(address - address % 4)) >>> 8 * (3 - address % 4)) & 0xff
   if (scenario === 'restore') { // install once the loaded project names the module and the unit has said it is missing
     for (let tries = 0; tries < 120 && !(await long(symbols.modwerk_dsp_missing)); tries++) await settle(10)
   }
   if (scenario === 'missing') {
-    const bank = await long(0x46c82456), hex = n => n.toString(16)
+    const bank = await long(0x46c82456)
     assert(bank, 'a project is loaded')
-    await settle(5) // ot_emu serves the next poke once its run loop has turned again
     for (let part = 0; part < 4; part++) await bench.command(`poke 0x${hex(bank + 0x8ed80 + part * 6322 + 8)} ${hex(EFFECT)}`) // T1's FX2 in every Part
     await bench.command(`poke 0x${hex(LIVE_FX + 8)} ${hex(EFFECT)}`)
     await settle(120)
@@ -128,6 +133,43 @@ if (mode === 'dumps') {
       while (await call(symbols.modwerk_dsp_pick, slot, track, at) !== 1) await wait(20)
     console.log(`picked ${pkg.key} on FX${slot + 1} of T1, T5 and T6, then FILTER on T6, on consecutive ticks`)
     await settle(600); bench.socket.end(); process.exit(0)
+  }
+  if (scenario === 'union') {
+    const [slot, chooserRow] = place(proofs), a = slot ? 8 : 0
+    const accepted = async () => [await long(symbols.dl_accepted), await long(symbols.dl_accepted + 4)]
+    const words = async core => long(symbols.dl_residency_words + 4 * core), size = data => new DataView(data.buffer).getUint32(32)
+    const others = second.split(',').map(path => new Uint8Array(readFileSync(path))) // DSP header: effect id at byte 38, slots at 39
+    const bank = await long(0x46c82456), part = async () => (await long(0x80000000)) & 0xff
+    assert(bank && await part() === 0, 'a project is loaded on Part 1')
+    // Each install after a bench command: in ot_emu, an install right after another timed out at ENTER (dsp2-AB3 too; not understood).
+    for (const other of others) { await keep(other); await long(0x46c82456) }
+    console.log(`${others.length} more modules installed`)
+    await settle(60)
+    // Part 2: Part 1's effects with the module on T5 (core 0), written as a paste or a project load would.
+    const part1 = [], from = bank + 0x8ed80, words0 = await words(0)
+    for (let i = 0; i < 16; i += 4) { const value = await long(from + i); part1.push(...[24, 16, 8, 0].map(shift => value >>> shift & 0xff)) }
+    part1[a + 4] = EFFECT
+    await bench.command(`poke 0x${hex(from + 6322)} ${Buffer.from(part1).toString('hex')}`)
+    await settle(120)
+    assert.equal(await words(0), words0 + size(data), `core 0 preloaded ${pkg.key} for Part 2`)
+    assert.notEqual(await byte(LIVE_FX + a + 4), EFFECT, 'T5 still runs Part 1')
+    const before = await accepted()
+    assert.equal(await call(symbols.modwerk_dsp_pick, 2, 0, 1), 1); await settle(60)
+    assert.equal(await part(), 1, 'Part 2 is active'); assert.equal(await byte(LIVE_FX + a + 4), EFFECT, `T5 runs ${pkg.key}`)
+    assert.deepEqual(await accepted(), before, 'the Part change sent nothing to the DSPs')
+    console.log(`${pkg.key} preloaded for Part 2 on core 0; the Part change to it sent no packet`)
+    // Part 1, now inactive, names the other modules on T1, T3 and T4 (core 1); then the module is picked on T2.
+    const words1 = await words(1)
+    for (const [n, other] of others.entries()) await bench.command(`poke 0x${hex(from + (other[39] & 1 ? 0 : 8) + [0, 2, 3][n])} ${hex(other[38]).padStart(2, '0')}`)
+    await settle(120)
+    const held = others.reduce((sum, other) => sum + size(other), 0)
+    assert.equal(await words(1), words1 + held, 'core 1 preloaded them for Part 1')
+    assert(words1 + held + size(data) > parseInt(proofs.dspLoader.B.tableWords, 16) - 64, `${pkg.key} would not fit beside them`)
+    const t2 = await byte(LIVE_FX + a + 1)
+    assert.equal(await call(symbols.modwerk_dsp_pick, slot, 1, chooserRow), 1); await settle(120)
+    assert.equal(await byte(LIVE_FX + a + 1), t2, 'T2 kept its effect')
+    console.log(`${pkg.key} on T2 refused: it does not fit core 1 beside what Part 1 names, though nothing live holds that`)
+    bench.socket.end(); process.exit(0)
   }
   await pick(0, ...place(proofs))
   if (scenario === 'pick') await pick(4, ...place(proofs))
@@ -198,6 +240,14 @@ if (mode === 'dumps') {
     assert.equal(u32('dl_selection_refused')[0], 0)
     assert.deepEqual(u32('dl_residency_words'), resident()); core(0, 'A', true); core(1, 'B', true)
     console.log(`picks meeting T1's upload waited (${u32('dl_selection_queued')[0]} queued, none dropped): T1 and T5 run ${pkg.key}, T6 its latest pick, FILTER: passed`)
+  } else if (scenario === 'union') {
+    const a = place(proofs)[0] ? 8 : 0
+    assert.equal(ids[a + 4], EFFECT, 'T5 runs the module in Part 2'); assert.notEqual(ids[a + 1], EFFECT, 'T2 kept its effect')
+    assert.equal(u32('dl_selection_refused')[0], 1); assert.equal(u32('dl_modal_shown')[0], 1)
+    const [core0, core1] = u32('dl_residency_words')
+    assert.equal(core0, resident()[0]); assert(core1 > resident()[1], 'core 1 holds what Part 1 names beside what runs')
+    core(0, 'A', true); core(1, 'B', false)
+    console.log('the union of Parts is preloaded, a Part change into it loads nothing, a pick it cannot hold is refused with a message: passed')
   } else if (scenario === 'missing') {
     assert.equal(ids[8], EFFECT, 'T1 runs E-Verb again'); assert(u32('modwerk_dsp_missing')[0] >= 1, 'the unit said it was missing')
     assert(u32('dl_parked')[0] >= 1 && u32('dl_reinit')[0] >= 1, 'the slot waited for the code, then started from its init')
@@ -230,6 +280,6 @@ if (mode === 'dumps') {
     console.log(`probe ${proofs.configuration.dsp.probe ?? 'none (whole receiver)'}: each core ${answered ? 'answered' : 'took the packet and never answered, as built'}, frames kept running: passed`)
   } else throw new Error('Unknown scenario ' + scenario)
 } else {
-  console.error('Usage: verify-octatrack-dsp-loader.mjs dumps BUILD OUT | drive SOCK BUILD SCENARIO PACKAGE | check BUILD OUT SCENARIO[:MODULE] (pick, remove, cycles, missing, restore, probe, stock, beside, queue)')
+  console.error('Usage: verify-octatrack-dsp-loader.mjs dumps BUILD OUT | drive SOCK BUILD SCENARIO PACKAGE [SECOND] | check BUILD OUT SCENARIO[:MODULE] (pick, remove, cycles, missing, restore, probe, stock, beside, queue, union)')
   process.exit(2)
 }
