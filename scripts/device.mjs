@@ -13,7 +13,7 @@
 //   npm run device -- screen [--png FILE]           # the display, in block characters or as a 4x PNG
 //   npm run device -- state                         # stopped / playing, recording
 //   npm run device -- loader                        # the DSP loader's counters (--dsp-loader bases)
-//   npm run device -- report                        # its full report (dsp.c modwerk_dsp_report, version 7: 53 words; miss0-2 the first refused packet (dsp_receiver.asm))
+//   npm run device -- report                        # its full report (dsp.c modwerk_dsp_report, version 8: 60 words; miss0-2 the first refused packet (dsp_receiver.asm))
 //   npm run device -- probe 0|1                     # one no-op loader packet to a DSP core
 //   npm run device -- meter 0|1                     # the DSP load meter's last 1024-frame window (core 0's idle iterations)
 //   npm run device -- enc A+3 | LEVEL-1 | fader 128 # encoders A-F and LEVEL, the crossfader
@@ -196,7 +196,7 @@ try {
     // An ABI 4 file names its module (sdk/runtime/loader/README.md); ABI 3 modules are module 0.
     const view = file ? new DataView(new Uint8Array(readFileSync(file)).buffer) : undefined
     if (view && (view.byteLength < 32 || view.getUint32(0) !== 0x4d57524d)) throw new Error(file + ' is not a runtime module.')
-    console.log(state(await trial(session, removal(identity.base, view?.getUint16(4) === 4 ? view.getUint32(28) : undefined))))
+    console.log(state(await trial(session, removal(identity.base, view?.getUint16(4) >= 4 ? view.getUint32(28) : undefined))))
   }
   if (command === 'try') {
     const data = new Uint8Array(readFileSync(file))
