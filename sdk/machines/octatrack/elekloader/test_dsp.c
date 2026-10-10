@@ -20,12 +20,13 @@ int main(void)
 {
     static const uint32_t words[3] = {1, 2, 3};
     static const uint16_t relocations[1] = {0};
-    const struct runtime_dsp none = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    struct runtime_dsp fx = {words, relocations, 3, 1, 1, 2, 244, 0, 26, 1, RUNTIME_MODELED, 70};
+    struct runtime_dsp none = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    struct runtime_dsp fx = {words, relocations, 3, 1, 1, 2, 244, 0, 26, 1, RUNTIME_MODELED, 70, 70};
     CHECK(modwerk_machine_dsp_admit(&none, &none) == RUNTIME_OK && modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_OK);
-    /* Only the module ids, never a stock effect's (each loads its own package). */
-    fx.id = 21; CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_CONFLICT);
-    fx.id = 40; CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_CONFLICT);
+    /* The effect id is a handle: the preferred one when it is a free module id, else the lowest free module id. */
+    fx.id = 27; CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_OK && fx.id == 27);
+    fx.id = 21; CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_OK && fx.id == 26); /* a stock effect's id */
+    fx.id = 40; CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_OK && fx.id == 26);
     fx.id = 26;
     /* The smaller core's arena, the instance block, a known cycle figure within the allowance. */
     fx.count = 2301; CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_MEMORY);
@@ -45,12 +46,21 @@ int main(void)
     CHECK(dl_catalog[0].cycles == 331 && dl_catalog[0].resident && dl_catalog[21].cycles == 331 && !dl_catalog[21].resident); /* NONE; a stock package */
     CHECK(dl_codes[0][26].words == words && dl_codes[1][26].words == words && dl_codes[1][26].count == 3 && dl_codes[1][26].init == 1 &&
           dl_codes[1][26].proc == 2 && dl_codes[0][26].relocations == relocations && dl_codes[0][26].relocation_count == 1);
+    /* Another module preferring 26 gets 27; with both held there is none left; a replacement keeps its own. */
+    struct runtime_dsp other = fx;
+    other.module = 71; CHECK(modwerk_machine_dsp_admit(&none, &other) == RUNTIME_OK && other.id == 27);
+    modwerk_machine_dsp_switch(&none, &other);
+    struct runtime_dsp third = fx;
+    third.module = 72; CHECK(modwerk_machine_dsp_admit(&none, &third) == RUNTIME_FULL);
+    third = other; third.id = 26; CHECK(modwerk_machine_dsp_admit(&other, &third) == RUNTIME_OK && third.id == 27);
+    modwerk_machine_dsp_switch(&other, &none);
     /* A track running it, or the manager mid-transaction, keeps it: removal and replacement wait. */
     modwerk_test_live_fx[13] = 26;
     CHECK(modwerk_machine_dsp_admit(&fx, &none) == RUNTIME_BUSY && modwerk_machine_dsp_admit(&fx, &fx) == RUNTIME_BUSY);
     modwerk_test_live_fx[13] = 4; idle = 0;
     CHECK(modwerk_machine_dsp_admit(&fx, &none) == RUNTIME_BUSY && modwerk_machine_dsp_admit(&fx, &fx) == RUNTIME_BUSY);
-    CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_OK); /* a new effect may register mid-transaction */
+    third = fx; third.module = 73;
+    CHECK(modwerk_machine_dsp_admit(&none, &third) == RUNTIME_OK && third.id == 27); /* a new effect may register mid-transaction */
     idle = 1;
     CHECK(modwerk_machine_dsp_admit(&fx, &none) == RUNTIME_OK);
     modwerk_machine_dsp_switch(&fx, &none);

@@ -69,10 +69,11 @@ that figure u8 (1 executed instructions, 2 modeled cycles, 3 hardware),
 state words per instance u8, and the delay-buffer words it reads from its
 slot's base u16. After the sites come the words (u32, 24 bits each) and the
 relocations (u16, rising; each names a word holding an offset into the
-code). The loader checks the section, keeps one owner per effect id, asks
-the machine (`modwerk_machine_dsp_admit`) whether its DSPs can take it, and
-hands it over at the switch (`modwerk_machine_dsp_switch`), masked with the
-module's hooks and sites. The code itself goes into a DSP only when a track
+code). The effect id is only the module's preferred one: modules are known
+by their module id, and the machine's admission (`modwerk_machine_dsp_admit`)
+gives each effect the id it gets, a handle, and says whether its DSPs can
+take it. The loader keeps that id and hands the effect over at the switch
+(`modwerk_machine_dsp_switch`), masked with the module's hooks and sites. The code itself goes into a DSP only when a track
 picks the effect (the Octatrack's `dsp.c`). `build.py --dsp` makes one from
 a DSP package Modwerk's builder proved, and checks those proofs again.
 

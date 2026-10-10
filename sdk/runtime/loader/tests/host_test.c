@@ -29,7 +29,13 @@ unsigned modwerk_machine_paused(struct runtime_span *span, unsigned max)
 /* DSP glue: refuses with `dsp_why` (masked or not) and records the last switch. */
 static int dsp_why, dsp_switches;
 static struct runtime_dsp dsp_from, dsp_to;
-int modwerk_machine_dsp_admit(const struct runtime_dsp *from, const struct runtime_dsp *to) { (void)from; (void)to; return dsp_why; }
+static int dsp_handle = -1; /* the effect id the machine gives, -1: the preferred one */
+int modwerk_machine_dsp_admit(const struct runtime_dsp *from, struct runtime_dsp *to)
+{
+    (void)from;
+    if (dsp_handle >= 0 && to->count) to->id = (uint8_t)dsp_handle;
+    return dsp_why;
+}
 void modwerk_machine_dsp_switch(const struct runtime_dsp *from, const struct runtime_dsp *to)
 {
     CHECK(masked); dsp_from = *from; dsp_to = *to; ++dsp_switches;
@@ -245,7 +251,7 @@ int main(void)
     id = 40; begin5(0, 26, 5, 2); dsp_words(5, reloc, 2);
     CHECK(b->prepare(0, p, n) && b->publish(0) == MU_APPLIED && b->retire(0) && dsp_switches == 1);
     const struct runtime_module *fx = modwerk_runtime_module(0);
-    CHECK(fx && fx->id == 40 && !fx->hook[RUNTIME_TICK] && dsp_to.count == 5 && dsp_to.id == 26 && dsp_to.slots == 1 && dsp_to.init == 1 &&
+    CHECK(fx && fx->id == 40 && !fx->hook[RUNTIME_TICK] && dsp_to.count == 5 && dsp_to.id == 26 && dsp_to.module == 40 && dsp_to.slots == 1 && dsp_to.init == 1 &&
           dsp_to.proc == 2 && dsp_to.cycles == 244 && dsp_to.kind == RUNTIME_MODELED && dsp_to.state == 70 && dsp_to.buffer == 0x4000 && !dsp_from.count);
     CHECK(dsp_to.words == fx->dsp.words && dsp_to.words[0] == 0x0c0000u && dsp_to.words[1] == 1 && dsp_to.words[4] == 0x0c0004u &&
           dsp_to.relocation_count == 2 && dsp_to.relocations[0] == 1 && dsp_to.relocations[1] == 3);
@@ -260,9 +266,13 @@ int main(void)
         free = modwerk_runtime_free(0);
         CHECK(!b->prepare(0, p, n) && modwerk_runtime_refusal() == RUNTIME_MALFORMED && modwerk_runtime_free(0) == free && dsp_switches == 1);
     }
-    /* One owner per effect: another module claiming effect 26 is refused. */
-    id = 41; begin5(0, 26, 5, 2); dsp_words(5, reloc, 2);
-    CHECK(!b->prepare(0, p, n) && modwerk_runtime_refusal() == RUNTIME_CONFLICT);
+    /* Another module preferring effect 26 loads beside it with the effect id the machine gives (a handle), and keeps it. */
+    id = 41; begin5(0, 26, 5, 2); dsp_words(5, reloc, 2); dsp_handle = 30;
+    CHECK(b->prepare(0, p, n) && b->publish(0) == MU_APPLIED && b->retire(0) && dsp_switches == 2 && dsp_to.id == 30 && dsp_to.module == 41);
+    CHECK(modwerk_runtime_module(1)->dsp.id == 30 && modwerk_runtime_module(0)->dsp.id == 26);
+    dsp_handle = -1; begin(0, 0, RUNTIME_NONE, 0, 0, 0, 0);
+    CHECK(b->prepare(0, p, n) && b->publish(0) == MU_APPLIED && b->retire(0) && dsp_switches == 3 && dsp_from.id == 30);
+    dsp_switches = 1;
     /* What the machine refuses (the DSP's memory, cycles, an effect in use) is the refusal, before or at the switch. */
     id = 41; begin5(0, 27, 5, 2); dsp_words(5, reloc, 2);
     dsp_why = RUNTIME_CYCLES;

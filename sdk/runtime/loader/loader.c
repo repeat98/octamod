@@ -162,7 +162,8 @@ static int switch_to(unsigned position, struct runtime_module *to)
 {
     const struct runtime_module *from = live[position];
     uint32_t mask = modwerk_machine_mask();
-    int ok = !in_flight(from, to) && holds(from, 1) && !modwerk_machine_dsp_admit(dsp_of(from), dsp_of(to));
+    struct runtime_dsp want = *dsp_of(to); /* the machine keeps the effect id it gave at admission */
+    int ok = !in_flight(from, to) && holds(from, 1) && !modwerk_machine_dsp_admit(dsp_of(from), &want) && want.id == dsp_of(to)->id;
     if (ok) {
         put(from, 0);
         ok = holds(to, 0);
@@ -187,13 +188,6 @@ static unsigned position_of(uint32_t id)
         if (!live[i] && free == RUNTIME_MODULES) free = i;
     }
     return free;
-}
-/* Does another live module own DSP effect `id`? */
-static int dsp_claimed(unsigned position, uint32_t id)
-{
-    for (unsigned k = 0; k < RUNTIME_MODULES; ++k)
-        if (k != position && live[k] && live[k]->dsp.count && live[k]->dsp.id == id) return 1;
-    return 0;
 }
 /* Does a site of another live module share a byte with [address, address + n)? */
 static int claimed(unsigned position, uint32_t address, uint32_t n)
@@ -222,7 +216,7 @@ static int prepare(void *u, const uint8_t *data, uint32_t length)
     if (abi == 5) {
         dsp.count = be32(data + 32); dsp.relocation_count = (uint16_t)be16(data + 36); dsp.id = data[38]; dsp.slots = data[39];
         dsp.init = (uint16_t)be16(data + 40); dsp.proc = (uint16_t)be16(data + 42); dsp.cycles = (uint16_t)be16(data + 44);
-        dsp.kind = data[46]; dsp.state = data[47]; dsp.buffer = (uint16_t)be16(data + 48);
+        dsp.kind = data[46]; dsp.state = data[47]; dsp.buffer = (uint16_t)be16(data + 48); dsp.module = id;
     }
     if (image > RUNTIME_IMAGE_BYTES || bss > RUNTIME_IMAGE_BYTES - image || hooks > RUNTIME_EVENTS ||
         count > RUNTIME_RELOCATIONS || sites > RUNTIME_SITES || length < at + image + 4u * count) return refuse(RUNTIME_MALFORMED);
@@ -255,11 +249,10 @@ static int prepare(void *u, const uint8_t *data, uint32_t length)
         if (r >= dsp.count || be32(words + 4u * r) >= dsp.count || (i && r <= be16(dsp_relocation + 2u * i - 2u)))
             return refuse(RUNTIME_MALFORMED);
     }
-    /* Admission: a position, bytes and an effect no other live module owns, what the machine's DSPs take, memory. */
+    /* Admission: a position, bytes no other live module owns, an effect id and what the machine's DSPs take, memory. */
     slot = position_of(id);
     if (slot == RUNTIME_MODULES) return refuse(RUNTIME_FULL);
     for (uint32_t i = 0; i < sites; ++i) if (claimed(slot, address[i], size[i])) return refuse(RUNTIME_CONFLICT);
-    if (dsp.count && dsp_claimed(slot, dsp.id)) return refuse(RUNTIME_CONFLICT);
     int why = modwerk_machine_dsp_admit(dsp_of(live[slot]), &dsp);
     if (why) return refuse((enum runtime_refusal)why);
     if (image || sites || dsp.count) {

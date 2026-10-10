@@ -108,7 +108,7 @@ unsigned modwerk_machine_paused(struct runtime_span *span, unsigned max)
 
 #ifndef MODWERK_DSP_LOADER
 /* This base has no DSP loader (dsp.c, build_core.py --dsp-loader): no module brings DSP code. */
-int modwerk_machine_dsp_admit(const struct runtime_dsp *from, const struct runtime_dsp *to) { (void)from; return to->count ? RUNTIME_MALFORMED : RUNTIME_OK; }
+int modwerk_machine_dsp_admit(const struct runtime_dsp *from, struct runtime_dsp *to) { (void)from; return to->count ? RUNTIME_MALFORMED : RUNTIME_OK; }
 void modwerk_machine_dsp_switch(const struct runtime_dsp *from, const struct runtime_dsp *to) { (void)from; (void)to; }
 #endif
 

@@ -51,13 +51,21 @@ static int in_use(unsigned id)
     for (unsigned i = 0; i < 16; ++i) if (LIVE_FX[i] == id) return 1;
     return 0;
 }
-int modwerk_machine_dsp_admit(const struct runtime_dsp *from, const struct runtime_dsp *to)
+/* Handles (owner, 11 October 2026): a module's effect id is a handle the base gives, not the module's for
+ * good. A replacement keeps its module's; a new module gets its preferred id (today's catalogue assignment,
+ * which projects without a map file name) when no live module holds it, else the lowest free module id.
+ * shortcut: only live modules hold handles; the project map file will add the current project's names. */
+static int held(unsigned id) { return modwerk_dsp_modules >> id & 1u && !dl_catalog[id].resident; }
+int modwerk_machine_dsp_admit(const struct runtime_dsp *from, struct runtime_dsp *to)
 {
     /* An effect a track runs, or one a transaction may hold between prepare and retirement, stays.
      * A new one may register at any time: no transaction names an effect nobody has picked. */
     if (from->count && (!dl_publication_idle() || in_use(from->id))) return RUNTIME_BUSY;
     if (!to->count) return RUNTIME_OK;
-    if (to->id > 31 || !(modwerk_dsp_modules >> to->id & 1u)) return RUNTIME_CONFLICT;
+    unsigned id = from->count ? from->id : to->id < 32u && modwerk_dsp_modules >> to->id & 1u && !held(to->id) ? to->id : 32u;
+    for (unsigned k = 0; id == 32u && k < 32u; ++k) if (modwerk_dsp_modules >> k & 1u && !held(k)) id = k;
+    if (id == 32u) return RUNTIME_FULL; /* every module id has a live module */
+    to->id = (uint8_t)id;
     unsigned arena = modwerk_dsp_arena[0] < modwerk_dsp_arena[1] ? modwerk_dsp_arena[0] : modwerk_dsp_arena[1];
     if (to->count > arena || to->state > SLOT_WORDS || to->buffer > (to->slots & 1u ? FX1_BUFFER : FX2_BUFFER)) return RUNTIME_MEMORY;
     /* shortcut: modeled cycles and executed instructions admit in this development base;

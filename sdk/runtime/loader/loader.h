@@ -32,6 +32,8 @@ struct runtime_dsp {
     uint16_t relocation_count, init, proc, cycles; /* cycles: worst case per sample and instance */
     uint16_t buffer;               /* Y words of the slot's delay buffer it reads from its base; 0 none */
     uint8_t id, slots, kind, state;  /* effect id; 1 FX1, 2 FX2; cycles' evidence; state words per instance */
+    uint32_t module;                 /* the module's id: its identity. The package's effect id is only its
+                                      * preferred one; the machine's admission gives the one it gets. */
 };
 enum runtime_cycles { RUNTIME_EXECUTED = 1, RUNTIME_MODELED, RUNTIME_HARDWARE };
 /* At the start of the module's pool extent, followed by its sites, code, data, bss and DSP code. */
@@ -74,6 +76,6 @@ unsigned modwerk_machine_paused(struct runtime_span *, unsigned max);
 /* DSP effects: may `to` take `from`'s place (either may be absent: count 0)?
  * A runtime_refusal; checked at admission and again, masked, at the switch,
  * which then calls dsp_switch. A machine without a DSP loader refuses any. */
-int modwerk_machine_dsp_admit(const struct runtime_dsp *from, const struct runtime_dsp *to);
+int modwerk_machine_dsp_admit(const struct runtime_dsp *from, struct runtime_dsp *to); /* may set to->id */
 void modwerk_machine_dsp_switch(const struct runtime_dsp *from, const struct runtime_dsp *to);
 #endif
