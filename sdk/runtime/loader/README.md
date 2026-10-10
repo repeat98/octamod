@@ -77,6 +77,14 @@ take it. The loader keeps that id and hands the effect over at the switch
 picks the effect (the Octatrack's `dsp.c`). `build.py --dsp` makes one from
 a DSP package Modwerk's builder proved, and checks those proofs again.
 
+ABI 6 adds 18 bytes to that descriptor (a 68-byte header): the module's
+display name, 16 bytes NUL-padded (projects record the module by it, so a
+missing one can be named), and its parameter-layout number u16, which a
+version raises when its stored parameter values change meaning. `build.py
+--dsp` takes the name from the catalogue (`--name` overrides it) and the
+module id from the catalogue id. ABI 5 packages still load, with no name and
+layout 0.
+
 ## Several modules at once
 
 - **Admission before anything changes.** A package is refused, with the

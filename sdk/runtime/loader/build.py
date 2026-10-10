@@ -17,8 +17,8 @@ by exactly 0x10000 are their references to themselves, any other difference
 is refused. Elemods list their relocations. The base adds the module's
 address to each self-reference at load. ColdFire, no C library or libgcc.
 The module's id is the first four bytes of the SHA-256 of its name (the
-elemod's id, or the output file's stem): a package with a live module's id
-replaces it, and an empty one removes it.
+elemod's id, a DSP package's catalogue id, or the output file's stem): a
+package with a live module's id replaces it, and an empty one removes it.
 
 A DSP effect (the Octatrack's), from a relocatable DSP package Modwerk's
 package builder made and proved (its words placed at four origins equal
@@ -90,12 +90,13 @@ def package(image, bss, hooks, offsets, sites=(), name='', dsp=None):
     if dsp:
         head += struct.pack('>IHBBHHHBBH', len(dsp['words']), len(dsp['relocations']), dsp['effect'], dsp['slots'],
                             dsp['init'], dsp['proc'], dsp['cycles'], dsp['kind'], dsp['state'], dsp['buffer'])
+        head += dsp['name'].encode().ljust(16, b'\0') + struct.pack('>H', dsp['layout'])
         records += struct.pack('>%dI' % len(dsp['words']), *dsp['words']) + struct.pack('>%dH' % len(dsp['relocations']), *dsp['relocations'])
-    return (b'MWRM' + struct.pack('>HH', 5 if dsp else 4, 0) + head + struct.pack('>%dI' % len(hooks), *hooks) + image
+    return (b'MWRM' + struct.pack('>HH', 6 if dsp else 4, 0) + head + struct.pack('>%dI' % len(hooks), *hooks) + image
             + struct.pack('>%dI' % len(offsets), *offsets) + records)
 
 
-def dsp_section(pkg, slots, cycles, kind, state, buffer=0):
+def dsp_section(pkg, slots, cycles, kind, state, buffer=0, name='', layout=1):
     """A relocatable DSP package (Modwerk's package builder: 24-bit words as hex,
     relocations, init, proc, its effect id and placement proofs) and its needs."""
     code = pkg['code']
@@ -115,8 +116,10 @@ def dsp_section(pkg, slots, cycles, kind, state, buffer=0):
             and 0 <= buffer <= BUFFER_WORDS):
         raise ValueError('Give the effect its slots, a cycle figure and its kind, its state words (at most %d) and the '
                          'delay-buffer words it reads (at most %d).' % (STATE_WORDS, BUFFER_WORDS))
+    if not (0 < len(name) <= 15 and name.isascii() and name.isprintable() and 0 < layout < 65536):
+        raise ValueError('Give the effect a display name of 1-15 printable ASCII characters and a layout number of 1-65535.')
     return dict(words=words, relocations=relocations, effect=pkg['fxId'], slots=SLOTS[slots], init=pkg['init'], proc=pkg['proc'],
-                cycles=cycles, kind=CYCLE_KINDS[kind], state=state, buffer=buffer)
+                cycles=cycles, kind=CYCLE_KINDS[kind], state=state, buffer=buffer, name=name, layout=layout)
 
 
 def link_elemod(doc, stock_at, base_symbols):
@@ -243,6 +246,8 @@ def main():
     parser.add_argument('--cycles-kind', choices=sorted(CYCLE_KINDS))
     parser.add_argument('--state', type=int, help='r7 state words per instance')
     parser.add_argument('--buffer', type=int, default=0, help='Y words of the slot buffer the effect reads from its base')
+    parser.add_argument('--name', help='the display name projects record it by (default: its catalogue name)')
+    parser.add_argument('--layout', type=int, default=1, help='parameter-layout number: raise it when stored values change meaning')
     args = parser.parse_args()
     if (bool(args.sources) and bool(args.elemod)) or not (args.sources or args.elemod or args.dsp) or (args.elemod and args.dsp):
         parser.error('Give C sources, --elemod or --dsp.')
@@ -253,16 +258,19 @@ def main():
         pkg = next((p for p in doc['packages'] if p['id'] == key), None) if 'packages' in doc else doc[key] if key else doc
         if not pkg:
             parser.error('No DSP package %s in %s.' % (key, path))
-        dsp = dsp_section(pkg, args.slots, args.cycles or 0, args.cycles_kind, args.state or 0, args.buffer)
+        documents = json.loads((Path(__file__).resolve().parents[3] / 'src/catalog/module-documents.json').read_text())
+        named = next((m.get('name') for m in documents.get('modules', []) if m.get('id') == pkg['id']), None) if 'id' in pkg else None
+        dsp = dsp_section(pkg, args.slots, args.cycles or 0, args.cycles_kind, args.state or 0, args.buffer,
+                          args.name or named or pkg.get('key', ''), args.layout)
     if args.elemod:
         data = build_elemod(args)
     elif args.sources:
         data = build_c(args.sources, args.cross, args.output.stem, dsp)
     else:
-        data = package(b'', 0, [], [], name=args.output.stem, dsp=dsp)
+        data = package(b'', 0, [], [], name=pkg.get('id', args.output.stem), dsp=dsp)
     args.output.write_bytes(data)
     image, bss, count, hooks, sites, ident = struct.unpack_from('>IIIIII', data, 8)
-    header = 50 if dsp else 32
+    header = 68 if dsp else 32
     print('%s: module %08x, %d bytes of code and data, %d of bss, %d relocations, %d hooks, %d stock-code sites%s' % (
         args.output, ident, image, bss, count, sum(h != NONE for h in struct.unpack_from('>%dI' % hooks, data, header)), sites,
         ', DSP effect %d: %d words, %d relocations' % (dsp['effect'], len(dsp['words']), len(dsp['relocations'])) if dsp else ''))

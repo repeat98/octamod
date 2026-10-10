@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include "upload.h"
 #include "modwerk_module.h"
-#define RUNTIME_HEADER_BYTES 50u        /* ABI 5 (DSP code); ABI 4 has 32, ABI 3 28 and is module 0 */
+#define RUNTIME_HEADER_BYTES 68u        /* ABI 6 (DSP code, its name and layout); ABI 5 50, ABI 4 32, ABI 3 28 (module 0) */
 #define RUNTIME_IMAGE_BYTES 32768u       /* one module's image and bss */
 #define RUNTIME_RELOCATIONS 2048u
 #define RUNTIME_SITES 64u
@@ -34,6 +34,9 @@ struct runtime_dsp {
     uint8_t id, slots, kind, state;  /* effect id; 1 FX1, 2 FX2; cycles' evidence; state words per instance */
     uint32_t module;                 /* the module's id: its identity. The package's effect id is only its
                                       * preferred one; the machine's admission gives the one it gets. */
+    uint16_t layout;                 /* what its stored parameter values mean; a change that reads them
+                                      * differently raises it (ABI 6; 0 from ABI 5) */
+    char name[16];                   /* its display name, NUL-ended (ABI 6; empty from ABI 5) */
 };
 enum runtime_cycles { RUNTIME_EXECUTED = 1, RUNTIME_MODELED, RUNTIME_HARDWARE };
 /* At the start of the module's pool extent, followed by its sites, code, data, bss and DSP code. */

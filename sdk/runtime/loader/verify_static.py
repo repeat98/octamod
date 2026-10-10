@@ -19,13 +19,13 @@ import tempfile
 
 
 def unpack(data):
-    """(image, self-reference offsets, sites) of an ABI 3, 4 or 5 package (its DSP code is not linked statically)."""
+    """(image, self-reference offsets, sites) of an ABI 3 to 6 package (its DSP code is not linked statically)."""
     abi = struct.unpack_from('>H', data, 4)[0] if data[:4] == b'MWRM' else 0
-    if abi not in (3, 4, 5):
-        raise ValueError('Not an ABI 3, 4 or 5 runtime package.')
+    if abi not in (3, 4, 5, 6):
+        raise ValueError('Not an ABI 3 to 6 runtime package.')
     image, _, count, hooks, sites = struct.unpack_from('>IIIII', data, 8)
-    dsp_words, dsp_relocations = struct.unpack_from('>IH', data, 32) if abi == 5 else (0, 0)
-    at = {3: 28, 4: 32, 5: 50}[abi] + 4 * hooks
+    dsp_words, dsp_relocations = struct.unpack_from('>IH', data, 32) if abi >= 5 else (0, 0)
+    at = {3: 28, 4: 32, 5: 50, 6: 68}[abi] + 4 * hooks
     code, at = data[at:at + image], at + image
     offsets = struct.unpack_from('>%dI' % count, data, at)
     at += 4 * count

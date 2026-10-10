@@ -255,6 +255,16 @@ int main(void)
           dsp_to.proc == 2 && dsp_to.cycles == 244 && dsp_to.kind == RUNTIME_MODELED && dsp_to.state == 70 && dsp_to.buffer == 0x4000 && !dsp_from.count);
     CHECK(dsp_to.words == fx->dsp.words && dsp_to.words[0] == 0x0c0000u && dsp_to.words[1] == 1 && dsp_to.words[4] == 0x0c0004u &&
           dsp_to.relocation_count == 2 && dsp_to.relocations[0] == 1 && dsp_to.relocations[1] == 3);
+    CHECK(!fx->dsp.name[0] && !fx->dsp.layout); /* ABI 5: no name, layout 0 */
+    /* ABI 6: the DSP descriptor adds the display name (16 bytes, NUL-ended) and the parameter-layout number. */
+    id = 40; begin5(0, 26, 5, 2);
+    memmove(p + 68, p + 50, n - 50); n += 18; p[5] = 6;
+    memcpy(p + 50, "E-Verb\0\0\0\0\0\0\0\0\0X", 16); p[66] = 0; p[67] = 3; /* an unterminated name is cut at 15 */
+    dsp_words(5, reloc, 2);
+    CHECK(b->prepare(0, p, n) && b->publish(0) == MU_APPLIED && b->retire(0) && dsp_switches == 2);
+    fx = modwerk_runtime_module(0);
+    CHECK(!strcmp(fx->dsp.name, "E-Verb") && fx->dsp.layout == 3 && dsp_to.layout == 3 && !strcmp(dsp_to.name, "E-Verb"));
+    dsp_switches = 1;
     /* Malformed DSP sections change nothing. */
     for (unsigned bad = 0; bad < 6; ++bad) {
         id = 41; begin5(0, 27, 5, 2); dsp_words(5, bad == 2 ? unordered : reloc, 2);

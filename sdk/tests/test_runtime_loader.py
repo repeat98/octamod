@@ -55,19 +55,22 @@ class LoaderTests(unittest.TestCase):
     def test_dsp_effect_package(self):
         import json
         pkg = next(p for p in json.loads((ROOT / 'src/engine/assets/dsp-packages.json').read_text())['packages'] if p['id'] == 'everb')
-        dsp = build.dsp_section(pkg, 'fx2', 382, 'executed', 132, 16384)
+        dsp = build.dsp_section(pkg, 'fx2', 382, 'executed', 132, 16384, 'E-Verb', 2)
         self.assertEqual((len(dsp['words']), dsp['relocations'], dsp['effect'], dsp['slots'], dsp['kind']), (1588, [5, 66, 683], 27, 2, 1))
         data = build.package(b'', 0, [], [], name='everb', dsp=dsp)
-        self.assertEqual(data[:8], b'MWRM\0\5\0\0')
+        self.assertEqual(data[:8], b'MWRM\0\6\0\0')
         self.assertEqual(struct.unpack_from('>IHBBHHHBBH', data, 32), (1588, 3, 27, 2, 0, 51, 382, 1, 132, 16384))
-        self.assertEqual(len(data), 50 + 4 * 1588 + 2 * 3)
-        self.assertEqual(struct.unpack_from('>I', data, 50)[0], dsp['words'][0])
+        self.assertEqual((data[50:66], struct.unpack_from('>H', data, 66)[0]), (b'E-Verb' + b'\0' * 10, 2)) # ABI 6: name, layout
+        self.assertEqual(len(data), 68 + 4 * 1588 + 2 * 3)
+        self.assertEqual(struct.unpack_from('>I', data, 68)[0], dsp['words'][0])
         self.assertEqual(verify_static.unpack(data), (b'', (), []))
         for broken in ({'proofs': [{'base': 4096, 'sha256': '0' * 64}] * 2}, {'proofs': []}, {'sha256': '0' * 64}):
             with self.subTest(broken=list(broken)), self.assertRaises(ValueError):
-                build.dsp_section({**pkg, **broken}, 'fx2', 382, 'executed', 132, 16384)
+                build.dsp_section({**pkg, **broken}, 'fx2', 382, 'executed', 132, 16384, 'E-Verb')
         with self.assertRaisesRegex(ValueError, 'state words'):
-            build.dsp_section(pkg, 'fx2', 382, 'executed', 133, 16384)
+            build.dsp_section(pkg, 'fx2', 382, 'executed', 133, 16384, 'E-Verb')
+        with self.assertRaisesRegex(ValueError, 'display name'):
+            build.dsp_section(pkg, 'fx2', 382, 'executed', 132, 16384, 'A' * 16)
 
     def test_converted_module_becomes_image_relocations_and_sites(self):
         stock = {0x40001000: bytes.fromhex('70201140000e'), 0x40002000: bytes.fromhex('4e714e71')}

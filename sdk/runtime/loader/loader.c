@@ -207,16 +207,20 @@ static int prepare(void *u, const uint8_t *data, uint32_t length)
     (void)u;
     candidate = 0; prepared = 0; refusal = RUNTIME_OK;
     if (length < 28u || data[0] != 'M' || data[1] != 'W' || data[2] != 'R' || data[3] != 'M' || be16(data + 4) < 3u ||
-        be16(data + 4) > 5u || be16(data + 6)) return refuse(RUNTIME_MALFORMED);
-    uint32_t abi = be16(data + 4), header = abi == 5 ? RUNTIME_HEADER_BYTES : abi == 4 ? 32u : 28u;
+        be16(data + 4) > 6u || be16(data + 6)) return refuse(RUNTIME_MALFORMED);
+    uint32_t abi = be16(data + 4), header = abi == 6 ? RUNTIME_HEADER_BYTES : abi == 5 ? 50u : abi == 4 ? 32u : 28u;
     if (length < header) return refuse(RUNTIME_MALFORMED);
     uint32_t image = be32(data + 8), bss = be32(data + 12), count = be32(data + 16), hooks = be32(data + 20),
              sites = be32(data + 24), id = abi > 3 ? be32(data + 28) : 0, end = image + bss, at = header + 4u * hooks;
     struct runtime_dsp dsp = no_dsp;
-    if (abi == 5) {
+    if (abi >= 5) {
         dsp.count = be32(data + 32); dsp.relocation_count = (uint16_t)be16(data + 36); dsp.id = data[38]; dsp.slots = data[39];
         dsp.init = (uint16_t)be16(data + 40); dsp.proc = (uint16_t)be16(data + 42); dsp.cycles = (uint16_t)be16(data + 44);
         dsp.kind = data[46]; dsp.state = data[47]; dsp.buffer = (uint16_t)be16(data + 48); dsp.module = id;
+        if (abi == 6) {
+            for (unsigned i = 0; i < 15u; ++i) dsp.name[i] = (char)data[50 + i];
+            dsp.layout = (uint16_t)be16(data + 66);
+        }
     }
     if (image > RUNTIME_IMAGE_BYTES || bss > RUNTIME_IMAGE_BYTES - image || hooks > RUNTIME_EVENTS ||
         count > RUNTIME_RELOCATIONS || sites > RUNTIME_SITES || length < at + image + 4u * count) return refuse(RUNTIME_MALFORMED);
