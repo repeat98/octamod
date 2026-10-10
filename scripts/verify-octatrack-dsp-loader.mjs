@@ -93,12 +93,15 @@ if (mode === 'dumps') {
     bench.socket.end(); process.exit(0)
   }
   const data = new Uint8Array(readFileSync(file)), id = new DataView(data.buffer).getUint32(28)
+  // Emulator-only reads: a three-instruction routine in the unused end of the boot stage returns a long.
+  const at = symbols.modwerk_boot_stage + 0x130000, long = async address => {
+    await bench.command(`poke 0x${at.toString(16)} 2079${address.toString(16).padStart(8, '0')}20084e75`) // movea.l (addr).l,a0; move.l a0,d0; rts
+    return (await call(at)) >>> 0
+  }
+  if (scenario === 'restore') { // install once the loaded project names the module and the unit has said it is missing
+    for (let tries = 0; tries < 120 && !(await long(symbols.modwerk_dsp_missing)); tries++) await settle(10)
+  }
   if (scenario === 'missing') {
-    // Emulator-only reads: a three-instruction routine in the unused end of the boot stage returns a long.
-    const at = symbols.modwerk_boot_stage + 0x130000, long = async address => {
-      await bench.command(`poke 0x${at.toString(16)} 2079${address.toString(16).padStart(8, '0')}20084e75`) // movea.l (addr).l,a0; move.l a0,d0; rts
-      return (await call(at)) >>> 0
-    }
     const bank = await long(0x46c82456), hex = n => n.toString(16)
     assert(bank, 'a project is loaded')
     await settle(5) // ot_emu serves the next poke once its run loop has turned again

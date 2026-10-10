@@ -45,7 +45,12 @@ DYNLOAD_HOOKS = (
     (0x40052474, 8, '3e7c95b32f444fd280cb96b2a6ea90525fe223d6e6b9352086d2cf41941ae854', 'dl_fx2_guard'),
     (0x4004a8a4, 6, '20577862965e35b56da3cc4660ac5df6a325e455467496552d181b68fff15e2d', 'dl_part_guard'),
     # Modwerk's: core 1's packet right after stock's own push to core 1 (dsp_core1.s), at frame-transfer state 3.
-    (0x400049ca, 8, '2945c558a5df272b3fb2ef6df3e3ab594b0c2c162f29c38ba624c3ec610c71f5', 'dl_state3'))
+    (0x400049ca, 8, '2945c558a5df272b3fb2ef6df3e3ab594b0c2c162f29c38ba624c3ec610c71f5', 'dl_state3'),
+    # Modwerk's: the project's map of module effect handles in project.work (fxmap.s, fxmap.c).
+    (0x400866d4, 6, '2fd04d71c59a1c9023b7b2b5ad2cf5a7445d464be69c48340b45e33b9ad07056', 'mw_project_begin'),
+    (0x400867aa, 6, 'b304cfb26163106388891990b3c67d3fe0b7f927d6a9f973d8d93d26d1171259', 'mw_project_line'),
+    (0x400888b2, 6, 'b7d260815d4140a98163e14d6e541df300de70a7bfc32b99792b5e61e46235c3', 'mw_project_write'),
+    (0x4008540e, 6, 'c607734f7f97b4a13e2047f38d5e2feace1aa3018ec9f19742f612139e7ac0bd', 'mw_project_end'))
 DSP_ALLOWANCE = 2808  # per core and sample: 3,120 cycles our code may spend (hardware) less a 10% margin (owner default)
 # The dearest stock effect per slot: DJ EQ, 330.75 executed instructions per sample at its worst split
 # (stock_dsp_worst.py, emulator; not hardware timing). Every slot without a module is charged it (dsp.c).
@@ -398,6 +403,8 @@ def main():
             (source / ('dsp_hooks.s' if name == 'hooks.s' else name)).write_text(text)
         shutil.copyfile(HERE / 'dsp.c', source / 'dsp.c')
         shutil.copyfile(HERE / 'dsp_core1.s', source / 'dsp_core1.s')
+        for name in ('fxmap.c', 'fxmap.s'):
+            shutil.copyfile(HERE / name, source / name)
         for lea, stock_list in ((0x40052496, 0x400d6090), (0x40052706, 0x400d6060)):
             if int.from_bytes(image[lea - device.main_load:lea - device.main_load + 4], 'big') != stock_list:
                 raise ValueError('An FX selector no longer reads its chooser list at %#x.' % lea)
@@ -455,6 +462,13 @@ def main():
         definitions += '#include "allocator.h"\nconst uint32_t dl_stub_at_boot = %#xu;\nconst uint32_t dl_pmap16 = 0;\n' % (
             dsp_layout['A']['free'] | stock)
         definitions += 'const uint32_t modwerk_dsp_modules = %#xu;\n' % dsp_layout['A']['free']
+        # fxmap.c: today's catalogue assignments, what a project without '#MODWERK_FX=' lines names.
+        names = {m['id']: m['name'] for m in json.loads((APP / 'src/catalog/module-documents.json').read_text())['modules']}
+        legacy = [(m['fxId'], m['id']) for m in chooser['modules'] if dsp_layout['A']['free'] >> (m.get('fxId') or 0) & 1]
+        definitions += 'struct fx_legacy { uint32_t module; uint32_t id; char name[16]; };\n'
+        definitions += 'const struct fx_legacy modwerk_fx_legacy[] = {%s};\nconst uint32_t modwerk_fx_legacy_count = %d;\n' % (
+            ', '.join('{%#xu, %d, %s}' % (int.from_bytes(hashlib.sha256(key.encode()).digest()[:4], 'big'), fx,
+                                           ctext(names.get(key, key)[:15])) for fx, key in legacy), len(legacy))
         definitions += loader_dsp.catalog_c(dsp_layout, DSP_RESERVE)
         definitions += 'const uint16_t modwerk_dsp_arena[2] = {%d, %d};\n' % tuple(
             dsp_layout[t]['tableWords'] - loader_dsp.SAVED for t in ('A', 'B'))
@@ -475,7 +489,7 @@ modwerk_retained_end:
                   license='GPL-3.0-or-later',
                   description='Private core-only Elekloader base with logger/startup, a USB vendor interface and a runtime module loader (hooks and stock-code sites); NOT a flash candidate.')
     recipe['sources'] += [p.name for p in sorted(source.glob('*.c'))] + ['hooks.s', 'retained.s', 'usb_base.s', 'boot.s'] + (
-        ['dsp_hooks.s', 'dsp_core1.s'] if args.dsp_loader else []) + (['usbaudio.s'] if args.dev else [])
+        ['dsp_hooks.s', 'dsp_core1.s', 'fxmap.s'] if args.dsp_loader else []) + (['usbaudio.s'] if args.dev else [])
     recipe['cflags'] = ['-std=c99', '-ffreestanding', '-fno-builtin', '-fno-common',
                         '-fno-zero-initialized-in-bss', '-fno-tree-loop-distribute-patterns',
                         '-fno-merge-constants', '-fno-asynchronous-unwind-tables', '-fno-unwind-tables',

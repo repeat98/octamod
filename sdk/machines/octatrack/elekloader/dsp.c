@@ -51,20 +51,52 @@ static int in_use(unsigned id)
     for (unsigned i = 0; i < 16; ++i) if (LIVE_FX[i] == id) return 1;
     return 0;
 }
-/* Handles (owner, 11 October 2026): a module's effect id is a handle the base gives, not the module's for
- * good. A replacement keeps its module's; a new module gets its preferred id (today's catalogue assignment,
- * which projects without a map file name) when no live module holds it, else the lowest free module id.
- * shortcut: only live modules hold handles; the project map file will add the current project's names. */
-static int held(unsigned id) { return modwerk_dsp_modules >> id & 1u && !dl_catalog[id].resident; }
+/* Handles (owner, 11 October 2026): a module's effect id is a handle, not the module's for good. The
+ * project's map (fxmap.c) names the module behind each; `owner` is who holds each this session. A
+ * module goes where the map puts it, else to its preferred id (today's catalogue assignment), else to
+ * the lowest free one, never to a handle the project names another module at; a replacement keeps its
+ * module's. The loader's record of a module's effect id is the one it got at admission, which a project
+ * load may move (rebind_tick), so the module id is what finds it. */
+uint32_t modwerk_fxmap_module(unsigned id);
+int modwerk_fxmap_handle(uint32_t module);
+uint32_t modwerk_fxmap_used(void);
+uint32_t modwerk_fxmap_generation(void);
+void modwerk_fxmap_assign(unsigned id, uint32_t module, unsigned layout, const char *name);
+void modwerk_fxmap_name(unsigned id, char *out);
+static uint32_t owner[32];
+static uint16_t owner_layout[32];
+static char owner_name[32][16];
+static unsigned rebinding; /* ticks into a rebind, 0 none */
+static int handle_of(uint32_t module)
+{
+    for (unsigned k = 0; module && k < 32u; ++k) if (owner[k] == module) return (int)k;
+    return -1;
+}
+static int free_for(unsigned k, uint32_t module, uint32_t used)
+{
+    if (k >= 32u || !(modwerk_dsp_modules >> k & 1u) || owner[k]) return 0;
+    uint32_t named = modwerk_fxmap_module(k);
+    return !named || named == module || !(used >> k & 1u);
+}
+static int choose(uint32_t module, unsigned preferred)
+{
+    uint32_t used = modwerk_fxmap_used();
+    int mapped = modwerk_fxmap_handle(module);
+    if (mapped >= 0 && !owner[mapped]) return mapped;
+    if (free_for(preferred, module, used)) return (int)preferred;
+    for (unsigned k = 0; k < 32u; ++k) if (free_for(k, module, used)) return (int)k;
+    return -1;
+}
 int modwerk_machine_dsp_admit(const struct runtime_dsp *from, struct runtime_dsp *to)
 {
     /* An effect a track runs, or one a transaction may hold between prepare and retirement, stays.
      * A new one may register at any time: no transaction names an effect nobody has picked. */
-    if (from->count && (!dl_publication_idle() || in_use(from->id))) return RUNTIME_BUSY;
+    int had = from->count ? handle_of(from->module) : -1;
+    if (from->count && (!dl_publication_idle() || rebinding || (had >= 0 && in_use((unsigned)had)))) return RUNTIME_BUSY;
     if (!to->count) return RUNTIME_OK;
-    unsigned id = from->count ? from->id : to->id < 32u && modwerk_dsp_modules >> to->id & 1u && !held(to->id) ? to->id : 32u;
-    for (unsigned k = 0; id == 32u && k < 32u; ++k) if (modwerk_dsp_modules >> k & 1u && !held(k)) id = k;
-    if (id == 32u) return RUNTIME_FULL; /* every module id has a live module */
+    if (rebinding) return RUNTIME_BUSY;
+    int id = had >= 0 ? had : choose(to->module, to->id);
+    if (id < 0) return RUNTIME_FULL; /* every module handle is held or named */
     to->id = (uint8_t)id;
     unsigned arena = modwerk_dsp_arena[0] < modwerk_dsp_arena[1] ? modwerk_dsp_arena[0] : modwerk_dsp_arena[1];
     if (to->count > arena || to->state > SLOT_WORDS || to->buffer > (to->slots & 1u ? FX1_BUFFER : FX2_BUFFER)) return RUNTIME_MEMORY;
@@ -76,20 +108,69 @@ int modwerk_machine_dsp_admit(const struct runtime_dsp *from, struct runtime_dsp
     return RUNTIME_OK;
 }
 /* Masked, by the loader's switch: the manager sees the catalog change between two of its steps. */
+static const struct dl_package unheld = STOCK;
+static void release(unsigned k)
+{
+    dl_catalog[k] = unheld;
+    dl_codes[0][k] = dl_codes[1][k] = (struct code){0, 0, 0, 0, 0, 0};
+    owner[k] = 0;
+}
 void modwerk_machine_dsp_switch(const struct runtime_dsp *from, const struct runtime_dsp *to)
 {
-    static const struct dl_package stock = STOCK;
-    if (from->count) {
-        dl_catalog[from->id] = stock;
-        dl_codes[0][from->id] = dl_codes[1][from->id] = (struct code){0, 0, 0, 0, 0, 0};
-    }
+    int had = from->count ? handle_of(from->module) : -1;
+    if (had >= 0) release((unsigned)had);
     if (to->count) {
         uint32_t cycles = to->cycles > MODWERK_DSP_RESERVE ? to->cycles : MODWERK_DSP_RESERVE;
         dl_catalog[to->id] = (struct dl_package){(uint16_t)to->count, 1, cycles, to->slots, 0, 1, to->buffer != 0};
         dl_codes[0][to->id] = dl_codes[1][to->id] =
             (struct code){to->words, to->relocations, (uint16_t)to->count, to->init, to->proc, to->relocation_count};
+        owner[to->id] = to->module, owner_layout[to->id] = to->layout;
+        for (unsigned i = 0; i < 16u; ++i) owner_name[to->id][i] = to->name[i];
+        modwerk_fxmap_assign(to->id, to->module, to->layout, to->name);
         nudge = 1; /* tracks may already name it (a saved project): load it there now */
     }
+}
+/* A project load can name an installed module at another handle, or another module at the handle one
+ * holds. Those modules let go first: the manager retires their code, so no slot runs the wrong module.
+ * Once it is idle, each takes the handle the map gives it (choose); one that finds none stays out. */
+static struct { struct dl_package package; struct code code[2]; uint32_t module; uint16_t layout; char name[16]; } moving[32];
+static unsigned moving_count;
+static uint32_t mapped; /* the map generation the handles follow */
+static void rebind_tick(void)
+{
+    if (!rebinding) {
+        uint32_t generation = modwerk_fxmap_generation();
+        if (generation == mapped || !dl_publication_idle()) return;
+        mapped = generation;
+        uint32_t used = modwerk_fxmap_used();
+        moving_count = 0;
+        for (unsigned k = 0; k < 32u; ++k) {
+            if (!owner[k]) continue;
+            int want = modwerk_fxmap_handle(owner[k]);
+            uint32_t named = modwerk_fxmap_module(k);
+            if (want == (int)k || (want < 0 && (!named || named == owner[k] || !(used >> k & 1u)))) continue;
+            moving[moving_count].package = dl_catalog[k];
+            moving[moving_count].code[0] = dl_codes[0][k], moving[moving_count].code[1] = dl_codes[1][k];
+            moving[moving_count].module = owner[k], moving[moving_count].layout = owner_layout[k];
+            for (unsigned i = 0; i < 16u; ++i) moving[moving_count].name[i] = owner_name[k][i];
+            ++moving_count;
+            release(k);
+        }
+        if (moving_count) rebinding = 1, nudge = 1;
+        return;
+    }
+    if (++rebinding < 4u || !dl_publication_idle()) return; /* the manager has retired what let go */
+    for (unsigned i = 0; i < moving_count; ++i) {
+        int id = choose(moving[i].module, 32u);
+        if (id < 0) continue;
+        dl_catalog[id] = moving[i].package;
+        dl_codes[0][id] = moving[i].code[0], dl_codes[1][id] = moving[i].code[1];
+        owner[id] = moving[i].module, owner_layout[id] = moving[i].layout;
+        for (unsigned c = 0; c < 16u; ++c) owner_name[id][c] = moving[i].name[c];
+        if (modwerk_fxmap_handle(moving[i].module) != id) modwerk_fxmap_assign((unsigned)id, moving[i].module, moving[i].layout, moving[i].name);
+    }
+    mapped = modwerk_fxmap_generation();
+    rebinding = 0, nudge = 1;
 }
 /* The module effects the current bank names: what each track runs, and its four Parts, working and saved.
  * Other banks stay on the card. A bit per effect id, for an update to warn before removing one. */
@@ -301,9 +382,14 @@ void modwerk_dsp_tick(void)
     }
     if ((dl_phase || dl_c1_phase) && EDMA_ES >> 31 && !(EDMA_ES >> 8 & 0xfu)) recover(); /* eDMA refused our transfer: at once */
     else if (modwerk_dsp_stalled(dl_frames, dl_phase || !dl_job_status(0) || !dl_job_status(1))) recover();
-    uint32_t dry = modwerk_dsp_dry(), fresh = dry & ~missing_shown;
-    if (fresh) {
-        ((void (*)(const char *, unsigned))0x4005a2b8u)("MODULE MISSING", 0x30);
+    rebind_tick();
+    uint32_t dry = rebinding ? missing_shown : modwerk_dsp_dry(), fresh = dry & ~missing_shown;
+    if (fresh) { /* the project's map names what is missing */
+        static char text[24] = "MISSING ";
+        unsigned k = 0;
+        while (!(fresh >> k & 1u)) ++k;
+        modwerk_fxmap_name(k, text + 8);
+        ((void (*)(const char *, unsigned))0x4005a2b8u)(text[8] ? text : "MODULE MISSING", 0x30);
         modwerk_dsp_missing = modwerk_dsp_missing + 1;
     }
     missing_shown = dry;
