@@ -31,7 +31,7 @@ type ModuleContent = { name: string; version: string; machine: string; summary: 
 function moduleContent(module: ModuleContent, appUrl: URL) {
   return link(appUrl.href, 'Module library') + `<h1>${escapeHtml(module.name)} for Elektron ${escapeHtml(module.machine)}</h1>`
     + paragraph(module.summary) + paragraph(`Module version ${module.version}. Base firmware: ${module.releases.join(' / ')}.`)
-    + (module.paused ? paragraph('Temporarily unavailable due to reported audio crackling. This module cannot currently be selected for a firmware build.') : '')
+    + (module.paused ? paragraph('Temporarily unavailable. This module cannot currently be selected for a firmware build.') : '')
     + '<h2>About this module</h2>' + paragraph(module.overview) + list(module.highlights)
     + '<h2>How to use it</h2>' + list(module.usage, true)
     + (module.controls.length ? '<h2>Controls</h2><dl>' + module.controls.map(control => `<dt>${escapeHtml(control.name)}</dt><dd>${escapeHtml(control.doc)}</dd>`).join('') + '</dl>' : '')

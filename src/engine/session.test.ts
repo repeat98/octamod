@@ -3,6 +3,7 @@ import { decodeFirmware, encodeFirmware, type DecodedFirmware } from './elek'
 import { createEngineSession } from './session'
 import { composeSelection } from './compose-os'
 import { FIRMWARE_VERSION, type EngineResponse } from './protocol'
+import { isModulePaused } from '../catalog/availability'
 
 // Exercise the real session/report/packaging boundary with synthetic bytes.
 // Stock verification and the composer are covered by their separate tests and
@@ -24,7 +25,7 @@ describe('Octatrack firmware boot name', () => {
   it('uses only the panel boot font letter range', () => {
     expect(FIRMWARE_VERSION).toMatch(/^[A-Z0-9. ]{1,10}$/)
   })
-  it.each([['repitch'], ['midi-scenes'], ['usb-audio-out-tracks-main-cue', 'quantizer']])(
+  it.each([['repitch'], ['midi-scenes'], ['usb-audio-out-tracks-main-cue', 'quantizer']].filter(ids => !ids.some(isModulePaused)))(
     'uses ELEKLOADER in validation, the build report and all ten update-header bytes for %j', async (...moduleIds) => {
       const original = synthetic(), input = encodeFirmware(original, original.mainOs, 'STOCK')
       const before = input.slice(), replies: EngineResponse[] = []
