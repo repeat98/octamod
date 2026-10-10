@@ -944,37 +944,53 @@ track's machine type. Stock keeps those bytes whatever the effect is; a
 module reads its knobs from them. Modules can disappear (an update, another
 card, another unit) and change version, and old projects must keep loading:
 
-- **Ids.** The DSP dispatch table has 32 effect ids. Stock uses 0 (NONE), 4,
-  5, 8, 12, 13, 16–22, 24 and 28, and its choosers can store nothing else,
-  so a stock project never holds another id. Module FX get only ids whose
-  stock dispatch is the null stub and that Modwerk's catalogue assigns
-  (`customIds`: 6, 7, 9, 10, 11, 14, 15, 23, 26, 27, 29, 30, 31); `dsp.c`
-  refuses any other, and each module keeps its id for good (E-Verb is 27).
-  The choosers map a row to an id through stock's own descriptor tables,
-  which Modwerk's composer extends; a stock effect's row and id never
-  change meaning. A module that replaces a stock effect in place (Sidechain
-  Compressor over COMPRESSOR, 24) does not fit this form: in the dynamic form
-  it takes its own id. Thirteen free ids is the hard limit on module FX one
-  project can name; nine are assigned.
-- **Missing modules.** A track naming a module effect that is not installed
-  runs stock's null stub, dry, never another module and never a crash; its
-  stored knob values stay untouched, and the unit shows `MODULE MISSING`
-  once. Installing the module makes the manager look again and park those
-  slots until their code is bound, so the effect starts from its init with
-  the project's values: the project comes back exactly (emulator, below).
-  On stock 1.40C, or a base without the loader, every unused id has stock's
-  NONE descriptor in both FX tables and dispatches to the null stub, so such
-  a slot shows and runs as NONE and keeps its byte until edited (read from
-  the stock tables, not yet run).
+- **Ids: handles, not fixed numbers** (owner, 11 October 2026). The DSP
+  dispatch table has 32 effect ids. Stock uses 0 (NONE), 4, 5, 8, 12, 13,
+  16–22, 24 and 28, and its choosers can store nothing else, so a stock
+  project never holds another id; those keep their meaning for good. The
+  other 13 whose stock dispatch is the null stub (6, 7, 9, 10, 11, 14, 15, 23,
+  26, 27, 29, 30, 31) are not given to modules for good: each is a handle
+  that one project assigns. A module is known by its identity: the package's
+  module id (the first four bytes of the SHA-256 of its name, as today), its
+  name and its parameter-layout number. Picking a module gives it a free
+  handle in that project. A map file in the project's folder, written with
+  the project, names the module behind each handle, so the project carries
+  its own assignments to another card or unit. The base owns the handles, the
+  chooser rows, the parameter pages, dispatch, memory and cycles; a module
+  only describes itself (name, pages, slots, cost, code), so modules cannot
+  collide and a new one needs neither an id nor a base rebuild. The limit is
+  13 different module effects per project, with no limit on the catalogue.
+  Machines work the same way through the track's machine-type byte.
+  - **Old projects.** A project without a map file reads each handle as
+    today's catalogue assignment (E-Verb 27, MINIVERB 23 and so on): a
+    module's package keeps that number as its preferred handle. Projects
+    from static builds and from bases before the map open as they did.
+  - **Versions.** The map records each module's parameter-layout number. A
+    module that changes what its stored knob values mean raises it, and the
+    unit converts them (when the module carries a conversion) or says so,
+    instead of burning a new id.
+  - **A module that replaces a stock effect in place** (Sidechain Compressor
+    over COMPRESSOR, 24) does not fit this form; in the dynamic form it is a
+    module with a handle of its own.
+- **Missing modules: reported and caught** (owner, 11 October 2026). A track
+  naming a module that is not installed runs stock's null stub, dry, never
+  another module and never a crash; its stored knob values stay untouched.
+  With the map, the unit names what is missing (for example `MISSING:
+  E-VERB`) when the project loads, and the vendor interface reports the
+  missing identities so the site can offer to install them. Installing the
+  module makes the manager look again and park those slots until their
+  code is bound, so the effect starts from its init with the project's values
+  (emulator, below). On stock 1.40C, or a base without the loader, every
+  unused id has stock's NONE descriptor in both FX tables and dispatches to
+  the null stub, so such a slot shows and runs as NONE and keeps its byte
+  until edited (read from the stock tables, not yet run).
 - **What a project uses.** `modwerk_dsp_used()` reports the module effects
   the current bank names (what runs, and all four Parts, working and saved)
   as one bit per id, for an update to warn before it removes one. Other
   banks are on the card; reading them belongs to the card work.
-- **Versions.** Knob values are stored raw, with no module version beside
-  them, so a newer version of a module must read an older version's stored
-  values the same way. A change that cannot takes a new effect id, and the
-  old id stays reserved. The package will declare a parameter-layout number
-  that installing over an older version checks.
+- **Stored knob values.** They are stored raw in the Part, with no version
+  beside them; the map's parameter-layout number (above) is what tells an
+  older layout from a newer one.
 - **Old projects and stock effects.** Stock effects keep their ids, code and
   parameters. Once they load on demand, the ledger admits the bank's stock
   effects first and modules only in what remains, so a module is refused
@@ -1250,9 +1266,9 @@ base does not do that.
   the pilot passes on the unit, and the union of a bank's Parts is preloaded.
 - Whether the selected module set persists across a power cycle (read from
   the card at boot).
-- Thirteen module effect ids at most per project (nine assigned). More
-  module FX than that needs a map beside the project (for example a file in
-  its folder naming the module behind each id), written when it is saved.
+- Decided (11 October 2026): effect ids are per-project handles named by a
+  map file in each project's folder; today's assignments are the default for
+  projects without one; missing modules are reported by name and run dry.
 - Whether a module that replaces a stock effect in place (Sidechain
   Compressor) is ported with its own id, which changes what old projects
   with COMPRESSOR hear back to stock.
