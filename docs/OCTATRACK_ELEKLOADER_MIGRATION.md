@@ -1254,17 +1254,40 @@ Each package declares the module's own figures, per instance:
 | --- | --- | --- | --- | --- | --- |
 | MINIVERB (23) | 532 | FX2 | 411, modeled: its static sample-loop bound; executed peak 23,360 per core and block for four (TESTING.md) | $00–$3F | 16K |
 | TAPEHEAD (31) | 422 | FX1, FX2 | 295, modeled: `cycle_count.py`, every setting; executed worst 18,000 per core and block for four (TESTING.md) | $00–$35 | none |
+| AIR CHORUS (30) | 795 | FX2 | 395, executed: 394.6 net worst, all splits, E-Verb's method (evidence/stock-comparison.json); its static bound, 732 modeled, is over the 491 a module may declare | $00–$83 | 16K |
+| SPECTRUM (10) | 1,391 | FX1 | 262, modeled: pricer words per sample in ISO, its dearest mode (README) | $00–$77 | none |
+| MODULATION (11) | 1,575 | FX1 | 354, modeled: pricer words per sample in its LINE loop (README); four instances beside a reverb overran on hardware (image 88) before that optimization, not retested since | $00–$6F | 2K of the 3K FX1 block |
 
-Emulator (`verify-octatrack-dsp-loader.mjs beside:MODULE`): each module
-installed over USB and picked on T1 and T5 (TAPEHEAD on FX2 of T1 and FX1 of
-T5), then PLATE REV on T2 and DARK REV on T6. Each core held the module word
-for word beside its reverb, dispatched its effect to it and took every packet,
-none rejected; no transport errors or refusals. Not yet on the unit.
+Emulator, private base `d47307e8…` with ABI 6 packages
+(`verify-octatrack-dsp-loader.mjs beside:MODULE`): each module installed over
+USB and picked on T1 and T5 (TAPEHEAD on FX2 of T1 and FX1 of T5; SPECTRUM
+and MODULATION on FX1), then PLATE REV on T2 and DARK REV on T6. Each core
+held the module word for word beside its reverb, dispatched its effect to it
+and took every packet, none rejected; no transport errors or refusals. E-Verb's
+`pick` still passes. Not yet on the unit.
 
-| Module | Private base | Resident words (core 1 / core 0) | Packets taken (core 1 / core 0) |
-| --- | --- | --- | --- |
-| MINIVERB | `810b2e96…` | 1,126 / 1,599 | 71 / 91 |
-| TAPEHEAD | `516dd9ef…` | 1,016 / 1,489 | 66 / 86 |
+| Module | Resident words (core 1 / core 0) | Packets taken (core 1 / core 0) |
+| --- | --- | --- |
+| MINIVERB | 1,126 / 1,599 | 71 / 91 |
+| TAPEHEAD | 1,016 / 1,489 | 66 / 86 |
+| AIR CHORUS | 1,389 / 1,862 | 82 / 102 |
+| SPECTRUM | 1,985 / 2,458 | 106 / 126 |
+| MODULATION | 2,169 / 2,642 | 114 / 134 |
+
+AIR CHORUS's 256-word sine table goes into the arena with its code: the loader
+places a package in one block per core, which its four contiguous placement
+proofs cover (`build.py` checks them again), so its split form is not needed.
+SPECTRUM's SHPE formatter, like every module's parameter pages, is built into
+the base by the chooser composer, not carried by the package. SPECTRUM declares no buffer,
+so none is reserved for it; its init reads its slot's entry only to tell FX1
+from FX2, and an FX1 entry only ever holds an FX1 base (`buffers.c`).
+
+EUCLID (29) is not ported: its sequencer is ColdFire code (`control.c`,
+`hooks.s`) that three stock-code detours call (0x4000d562 after the scene and
+LFO writes, 0x4009c3d4 and 0x4009c4d4 at PLAY). A runtime package takes
+stock-code sites only from an Elekloader-converted `.elemod`, which `build.py`
+refuses beside `--dsp`, and C sources beside `--dsp` get only the tick, draw,
+key and encoder hooks. Without that part its filter would run unsequenced.
 
 **Memory policy (owner decision).** The allocator admits the effects a target
 actually selects. Room goes to effects in use only: what no slot runs is
