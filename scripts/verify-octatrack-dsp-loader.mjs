@@ -20,7 +20,8 @@
 // stock effects load from boot, PLATE REV and DARK REV picked on T1 and T5, each bound into its core's arena), meter
 // (the load meter's last window read back; the emulator's timing, so the plumbing only), beside (the module on T1
 // and T5, FX2 where it has a row, FX1 on T5 when it has both, then PLATE REV on T2 and DARK REV on T6: every effect
-// each core runs is bound in its arena, the module word for word).
+// each core runs is bound in its arena, the module word for word), queue (the module on T1, then on T5, on T6 and
+// FILTER on T6 on the next ticks, while T1's upload runs: they wait, the latest per slot, and none is dropped).
 // SCENARIO:MODULE names the module by its catalogue id (src/engine/assets/dsp-packages.json); E-Verb by default.
 // The card needs a project whose Part 1 has no module effect on T1, T2, T5 or T6.
 // Emulator evidence only: executed instructions, no hardware timing or audio.
@@ -38,7 +39,7 @@ const LIVE_FX = 0x80000ec4
 const COUNTERS = { dl_residency_words: 8, dl_pool_base: 8, dl_selection_requested: 4, dl_selection_completed: 4,
   dl_selection_refused: 4, dl_errors: 4, dl_modal_shown: 4, dl_parked: 4, dl_reinit: 4, modwerk_dsp_missing: 4,
   modwerk_dsp_probes_ok: 4, modwerk_dsp_probes_failed: 4, dl_frames: 4, modwerk_dsp_meter_core: 4, modwerk_dsp_meter_bits: 4,
-  modwerk_dsp_meter: 20 }
+  modwerk_dsp_meter: 20, dl_selection_queued: 4, dl_selection_cancelled: 4 }
 const json = path => JSON.parse(readFileSync(path, 'utf8'))
 const build = dir => ({ proofs: json(join(dir, 'proofs.json')), symbols: json(join(dir, 'symbols.json')) })
 const [scenario, module = 'everb'] = (args[2] ?? '').split(':')
@@ -53,7 +54,7 @@ const place = (proofs, fx1First) => {
 
 if (mode === 'dumps') {
   const [dir, out] = args, { proofs, symbols } = build(dir), layout = proofs.dspLoader
-  const dumps = [...Object.entries(COUNTERS).map(([name, n]) => `0x${symbols[name].toString(16)},${n}=${out}/${name}.bin`),
+  const dumps = [...Object.entries(COUNTERS).filter(([name]) => name in symbols).map(([name, n]) => `0x${symbols[name].toString(16)},${n}=${out}/${name}.bin`),
     `0x${LIVE_FX.toString(16)},16=${out}/ids.bin`]
   console.log(`--mem-dump ${dumps.join(';')} --dsp-peek 0:X:215,64;1:X:215,64;0:P:${layout.A.table.slice(2)},${parseInt(layout.A.tableWords, 16)};1:P:${layout.B.table.slice(2)},${parseInt(layout.B.tableWords, 16)}`)
 } else if (mode === 'drive') {
@@ -120,6 +121,14 @@ if (mode === 'dumps') {
   await settle(60) // the manager handles the project's own effects in its first ticks
   // missing: what the project named is restored; restore: install only (old_projects.py checks the result).
   if (scenario === 'missing' || scenario === 'restore') { await settle(300); bench.socket.end(); process.exit(0) }
+  if (scenario === 'queue') {
+    // One pick a tick (dsp.c holds four; older bases one): T1's upload is still running when the others arrive.
+    const [slot, chooserRow] = place(proofs)
+    for (const [track, at] of [[0, chooserRow], [4, chooserRow], [5, chooserRow], [5, 1]]) // row 1: FILTER
+      while (await call(symbols.modwerk_dsp_pick, slot, track, at) !== 1) await wait(20)
+    console.log(`picked ${pkg.key} on FX${slot + 1} of T1, T5 and T6, then FILTER on T6, on consecutive ticks`)
+    await settle(600); bench.socket.end(); process.exit(0)
+  }
   await pick(0, ...place(proofs))
   if (scenario === 'pick') await pick(4, ...place(proofs))
   if (scenario === 'cycles') await pick(1, ...place(proofs))
@@ -181,6 +190,14 @@ if (mode === 'dumps') {
     assert.equal(u32('dl_selection_refused')[0], 1); assert.equal(u32('dl_modal_shown')[0], 1)
     assert.deepEqual(u32('dl_residency_words'), resident()); core(1, 'B', true)
     console.log('declared the most cycles a module may: T1 admitted, T2 on the same core refused with a message and left as it was: passed')
+  } else if (scenario === 'queue') {
+    const a = place(proofs)[0] ? 8 : 0
+    assert.equal(ids[a], EFFECT, 'T1 kept its pick'); assert.equal(ids[a + 4], EFFECT, 'T5 got its waiting pick')
+    assert.equal(ids[a + 5], 4, 'T6 got its latest pick, FILTER')
+    assert(u32('dl_selection_queued')[0] >= 2, 'picks waited'); assert.equal(u32('dl_selection_cancelled')[0], 0, 'none dropped')
+    assert.equal(u32('dl_selection_refused')[0], 0)
+    assert.deepEqual(u32('dl_residency_words'), resident()); core(0, 'A', true); core(1, 'B', true)
+    console.log(`picks meeting T1's upload waited (${u32('dl_selection_queued')[0]} queued, none dropped): T1 and T5 run ${pkg.key}, T6 its latest pick, FILTER: passed`)
   } else if (scenario === 'missing') {
     assert.equal(ids[8], EFFECT, 'T1 runs E-Verb again'); assert(u32('modwerk_dsp_missing')[0] >= 1, 'the unit said it was missing')
     assert(u32('dl_parked')[0] >= 1 && u32('dl_reinit')[0] >= 1, 'the slot waited for the code, then started from its init')
@@ -213,6 +230,6 @@ if (mode === 'dumps') {
     console.log(`probe ${proofs.configuration.dsp.probe ?? 'none (whole receiver)'}: each core ${answered ? 'answered' : 'took the packet and never answered, as built'}, frames kept running: passed`)
   } else throw new Error('Unknown scenario ' + scenario)
 } else {
-  console.error('Usage: verify-octatrack-dsp-loader.mjs dumps BUILD OUT | drive SOCK BUILD SCENARIO PACKAGE | check BUILD OUT SCENARIO[:MODULE] (pick, remove, cycles, missing, restore, probe, stock, beside)')
+  console.error('Usage: verify-octatrack-dsp-loader.mjs dumps BUILD OUT | drive SOCK BUILD SCENARIO PACKAGE | check BUILD OUT SCENARIO[:MODULE] (pick, remove, cycles, missing, restore, probe, stock, beside, queue)')
   process.exit(2)
 }

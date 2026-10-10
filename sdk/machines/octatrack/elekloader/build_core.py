@@ -58,7 +58,63 @@ DSP_RESERVE = 331
 DSP_EDITS = {
     # The FX selectors read their chooser list through these LEA operands, which the chooser composer repoints.
     'selection.c': (('descriptor=((volatile uint32_t *)(slot ? 0x400d6090u : 0x400d6060u))[s->row];',
-                     'descriptor=((volatile uint32_t *)*(volatile uint32_t *)(slot ? 0x40052496u : 0x40052706u))[s->row];'),),
+                     'descriptor=((volatile uint32_t *)*(volatile uint32_t *)(slot ? 0x40052496u : 0x40052706u))[s->row];'),
+                    # An FX pick that meets another slot's transaction waits, the latest per slot, and is replayed
+                    # through the stock setter once the manager is idle. A waiting pick names its own track and
+                    # chooser row (row bit 15): the panel may have moved on, which used to cancel it.
+                    ('static unsigned pending=0, replay=0;',
+                     'static unsigned pending=0, replay=0;\n'
+                     'static uint8_t later_row[16]; /* per slot: FX1 T1-T8, then FX2 */\n'
+                     'static uint32_t later=0, later_bank=0, later_part=0;\n'
+                     'volatile uint32_t dl_selection_queued=0;\n'
+                     'int dl_publication_idle(void);'),
+                    ('    s->track=*(volatile uint8_t *)0x80000000u;\n'
+                     '    s->slot=slot; s->source=source;\n'
+                     '    s->row=slot>=2 ? row : *(volatile uint32_t *)(slot ? 0x460d5ca8u : 0x460d5c94u);',
+                     '    s->track=slot<2 && row ? (row>>8)&7u : *(volatile uint8_t *)0x80000000u;\n'
+                     '    s->slot=slot; s->source=source;\n'
+                     '    s->row=slot>=2 ? row : row ? row&0xffu : *(volatile uint32_t *)(slot ? 0x460d5ca8u : 0x460d5c94u);'),
+                    ('    ((void (*)(void))(slot ? 0x40052474u : 0x400526e4u))();\n}\n#endif',
+                     '    /* The setter reads the current track and the chooser\'s cursor: a waiting pick\'s, for the call. */\n'
+                     '    volatile uint8_t *track=(volatile uint8_t *)0x80000000u;\n'
+                     '    volatile uint32_t *cursor=(volatile uint32_t *)(slot ? 0x460d5ca8u : 0x460d5c94u);\n'
+                     '    uint8_t was_track=*track; uint32_t was_row=*cursor;\n'
+                     '    if(row) { *track=(uint8_t)((row>>8)&7u); *cursor=row&0xffu; }\n'
+                     '    ((void (*)(void))(slot ? 0x40052474u : 0x400526e4u))();\n'
+                     '    if(row) { *track=was_track; *cursor=was_row; }\n}\n#endif'),
+                    ('    if(pending) {\n        /* A paste',
+                     '    if(slot<2) {\n'
+                     '        unsigned i=slot*8+request.track;\n'
+                     '        later&=~(1u<<i);\n'
+                     '        if(pending && (queued.slot!=slot || queued.track!=request.track)) {\n'
+                     '            if(request.before[i]==request.target[i]) return 1;\n'
+                     '            if(later && (later_bank!=request.bank || later_part!=request.part)) { later=0; ++dl_selection_cancelled; }\n'
+                     '            later_bank=request.bank; later_part=request.part;\n'
+                     '            later_row[i]=(uint8_t)request.row; later|=1u<<i; ++dl_selection_queued;\n'
+                     '            return 2;\n'
+                     '        }\n'
+                     '    }\n'
+                     '    if(pending) {\n        /* A paste'),
+                    ('void dl_selection_tick(void) {\n    struct dl_selection current;\n    if(!pending) return;\n'
+                     '    if(!dl_selection_capture(queued.slot,queued.row,queued.source,&current)',
+                     '/* The next waiting FX pick, through its stock setter and guard as the panel made it; a bank or\n'
+                     ' * Part change drops them (they edited the Part that was active). */\n'
+                     'static void next(void) {\n'
+                     '    if(!later) return;\n'
+                     '    if(*(volatile uint32_t *)0x46c82456u!=later_bank || *(volatile uint8_t *)0x80000003u!=later_part) {\n'
+                     '        later=0; ++dl_selection_cancelled; return;\n'
+                     '    }\n'
+                     '    if(!dl_publication_idle()) return;\n'
+                     '    unsigned i=0;\n'
+                     '    while(!(later>>i&1u)) ++i;\n'
+                     '    later&=~(1u<<i);\n'
+                     '    dl_selection_apply(i/8,0x8000u|(i&7u)<<8|later_row[i],0);\n'
+                     '}\n'
+                     'void dl_selection_tick(void) {\n    struct dl_selection current;\n    if(!pending) { next(); return; }\n'
+                     '    unsigned given=queued.slot<2 ? 0x8000u|queued.track<<8|queued.row : queued.row;\n'
+                     '    if(!dl_selection_capture(queued.slot,given,queued.source,&current)'),
+                    ('    replay=1; dl_selection_apply(queued.slot,queued.row,queued.source); replay=0;',
+                     '    replay=1; dl_selection_apply(queued.slot,given,queued.source); replay=0;')),
     # Modules register effects at run time (dsp.c), and admission charges their cycles.
     'manager.c': (('extern const struct dl_package dl_catalog[32];', 'extern struct dl_package dl_catalog[32];'),
                   ('extern const struct code dl_codes[2][32];', 'extern struct code dl_codes[2][32];'),

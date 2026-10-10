@@ -188,12 +188,14 @@ uint32_t modwerk_dsp_used(void)
 /* Development only: a chooser pick or Part change replayed as the panel makes
  * it, for scripted hardware runs (a USB test command calls modwerk_dsp_pick
  * from the engine task; the sys task's tick runs it, with the selectors'
- * own guards). slot: 0 FX1, 1 FX2 (track 0-7, chooser row), 2 Part (row = Part 0-3). */
-static volatile uint32_t pick;
+ * own guards). slot: 0 FX1, 1 FX2 (track 0-7, chooser row), 2 Part (row = Part 0-3).
+ * Up to four wait, one a tick, so a run can make picks on consecutive ticks. */
+static volatile uint32_t picks[4], picks_in, picks_out;
 int modwerk_dsp_pick(unsigned slot, unsigned track, unsigned row)
 {
-    if (pick || slot > 2 || track > 7 || row > (slot == 2 ? 3u : 31u)) return 0;
-    pick = 0x80000000u | slot << 16 | track << 8 | row;
+    if (picks_in - picks_out >= 4u || slot > 2 || track > 7 || row > (slot == 2 ? 3u : 31u)) return 0;
+    picks[picks_in % 4u] = slot << 16 | track << 8 | row;
+    picks_in = picks_in + 1;
     return 1;
 }
 /* A track naming a module effect that is not installed runs stock's null stub, dry,
@@ -395,9 +397,9 @@ void modwerk_dsp_tick(void)
     }
     missing_shown = dry;
     if (nudge) { nudge = 0; dl_residency_nudge(); }
-    uint32_t p = pick;
-    if (!p) return;
-    pick = 0;
+    if (picks_in == picks_out) return;
+    uint32_t p = picks[picks_out % 4u];
+    picks_out = picks_out + 1;
     unsigned slot = p >> 16 & 0xffu, row = p & 0xffu;
     if (slot == 2) { ((void (*)(unsigned))0x4004a8a4u)(row); return; } /* the manual Part change */
     *(volatile uint8_t *)0x80000000u = (uint8_t)(p >> 8);              /* the current track, as the selectors read it */
