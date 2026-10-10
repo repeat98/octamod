@@ -1245,17 +1245,26 @@ Either core 1 had no room for 2,000 more cycles, or `rep`, which holds off
 interrupts while it repeats, starved the DMA interrupts; not separated. The
 burn is now core 0 only and interruptible.
 
-**More module FX on demand** (11 October 2026). MINIVERB (id 23) has its
-chooser row after E-Verb's and loads as a package the same way (recipe in the
-[elekloader README](../sdk/machines/octatrack/elekloader/README.md#dsp-effects-on-demand)):
-532 words, FX2 only, its 16K buffer, r7 block to $3F, 411 cycles per sample
-(its static sample-loop bound, modeled; its executed peak was 23,360 per core
-and block for four instances, TESTING.md). Emulator, private base `810b2e96…`
-(`verify-octatrack-dsp-loader.mjs beside:miniverb`): installed over USB,
-picked on FX2 of T1 and T5, then PLATE REV on T2 and DARK REV on T6. Each core
-holds MINIVERB word for word beside its reverb (core 1 1,126 words, core 0
-1,599), dispatches effect 23 to it, and took every packet (71 and 91, none
-rejected); no transport errors or refusals. Not yet on the unit.
+**More module FX on demand** (11 October 2026). These modules have chooser
+rows after E-Verb's and load as packages the same way (recipes in the
+[elekloader README](../sdk/machines/octatrack/elekloader/README.md#dsp-effects-on-demand)).
+Each package declares the module's own figures, per instance:
+
+| Module (id) | Words | Slots | Cycles per sample (kind, source) | r7 block | Y buffer |
+| --- | --- | --- | --- | --- | --- |
+| MINIVERB (23) | 532 | FX2 | 411, modeled: its static sample-loop bound; executed peak 23,360 per core and block for four (TESTING.md) | $00–$3F | 16K |
+| TAPEHEAD (31) | 422 | FX1, FX2 | 295, modeled: `cycle_count.py`, every setting; executed worst 18,000 per core and block for four (TESTING.md) | $00–$35 | none |
+
+Emulator (`verify-octatrack-dsp-loader.mjs beside:MODULE`): each module
+installed over USB and picked on T1 and T5 (TAPEHEAD on FX2 of T1 and FX1 of
+T5), then PLATE REV on T2 and DARK REV on T6. Each core held the module word
+for word beside its reverb, dispatched its effect to it and took every packet,
+none rejected; no transport errors or refusals. Not yet on the unit.
+
+| Module | Private base | Resident words (core 1 / core 0) | Packets taken (core 1 / core 0) |
+| --- | --- | --- | --- |
+| MINIVERB | `810b2e96…` | 1,126 / 1,599 | 71 / 91 |
+| TAPEHEAD | `516dd9ef…` | 1,016 / 1,489 | 66 / 86 |
 
 **Memory policy (owner decision).** The allocator admits the effects a target
 actually selects. Room goes to effects in use only: what no slot runs is

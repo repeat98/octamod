@@ -66,7 +66,7 @@ needs Octabam's patched `dsp_asm` (`ELEKLOADER_DSP_ASM`), with
 Node 24 for Modwerk's chooser composer ([`octatrack-base-choosers.mjs`](../../../../scripts/octatrack-base-choosers.mjs)).
 The module FX with a chooser row (`MODULES` in `dsp_loader.py`) as packages. The
 figures are each module's own: cycles per sample and instance with their kind
-(E-Verb's executed worst case; MINIVERB's static sample-loop bound, modeled),
+(E-Verb's executed worst case; MINIVERB's and TAPEHEAD's static bounds, modeled),
 the extent of its r7 block and the Y words it reads:
 
 ```sh
@@ -77,6 +77,8 @@ python3 -B sdk/runtime/loader/build.py --dsp src/engine/assets/dsp-packages.json
   --slots fx2 --cycles 382 --cycles-kind executed --state 132 --buffer 16384 -o /private/everb.mwrm
 python3 -B sdk/runtime/loader/build.py --dsp src/engine/assets/dsp-packages.json:miniverb \
   --slots fx2 --cycles 411 --cycles-kind modeled --state 64 --buffer 16384 -o /private/miniverb.mwrm
+python3 -B sdk/runtime/loader/build.py --dsp src/engine/assets/dsp-packages.json:tapehead \
+  --slots both --cycles 295 --cycles-kind modeled --state 54 -o /private/tapehead.mwrm
 ```
 
 
