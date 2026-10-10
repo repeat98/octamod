@@ -1245,6 +1245,18 @@ Either core 1 had no room for 2,000 more cycles, or `rep`, which holds off
 interrupts while it repeats, starved the DMA interrupts; not separated. The
 burn is now core 0 only and interruptible.
 
+**More module FX on demand** (11 October 2026). MINIVERB (id 23) has its
+chooser row after E-Verb's and loads as a package the same way (recipe in the
+[elekloader README](../sdk/machines/octatrack/elekloader/README.md#dsp-effects-on-demand)):
+532 words, FX2 only, its 16K buffer, r7 block to $3F, 411 cycles per sample
+(its static sample-loop bound, modeled; its executed peak was 23,360 per core
+and block for four instances, TESTING.md). Emulator, private base `810b2e96…`
+(`verify-octatrack-dsp-loader.mjs beside:miniverb`): installed over USB,
+picked on FX2 of T1 and T5, then PLATE REV on T2 and DARK REV on T6. Each core
+holds MINIVERB word for word beside its reverb (core 1 1,126 words, core 0
+1,599), dispatches effect 23 to it, and took every packet (71 and 91, none
+rejected); no transport errors or refusals. Not yet on the unit.
+
 **Memory policy (owner decision).** The allocator admits the effects a target
 actually selects. Room goes to effects in use only: what no slot runs is
 freed. A stock pick can therefore be refused when modules hold the room. The
