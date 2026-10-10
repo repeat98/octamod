@@ -700,6 +700,7 @@ check passed, RAM-booted on a blank project):
   packet. Arming the job, not delivering it, stops the frames.
 - Rebinding on both cores (item D) is still unverified: the emulator runner
   started node in the wrong directory, and its rerun lacked the package mount.
+  (It passed in the emulator on 11 October: Milestone 3, first steps.)
 
 What arming a core-1 job did at state 7: the packet builder and every frame
 of a pending job read the core's host flags by switching the DSP select
@@ -1180,6 +1181,69 @@ Still open:
   edits (Octabam's `publication.c`). The manager's observer loads what those
   routes publish and keeps the slot dry until then.
 - Octabam's frame-DMA hook (0x40004bc0) is the one USB Audio In uses.
+
+### Milestone 3, first steps: waiting picks and the union of Parts (11 October 2026)
+
+**Waiting picks.** Before, a pick that met another slot's transaction was
+never refused but dropped: the second pick rolled the first one back, and
+moving to another track or the chooser cursor cancelled a waiting pick at
+the next tick (`selection.c` compared the panel's current track and cursor
+with the pick's). Now an FX pick that meets another slot's transaction
+waits, the latest per slot (FX1 and FX2 of T1-T8), and is replayed through
+the stock setter and its guard once the manager is idle, with its own track
+and chooser row set for the call and the panel's put back afterwards. A pick
+on the slot whose transaction runs replaces it, as before. A bank or Part
+change drops the picks still waiting, since they edited the Part that was
+active. The track keeps its effect until its pick is admitted, and nothing
+writes stock's FX arrays before (`selection.c` edits in `build_core.py`).
+
+**The union of a bank's Parts.** Every transaction also holds the module
+effects the current bank's four Parts name, per core, and the manager's
+observer starts one when that set changes: a project or bank load, a Part
+edit by any route, a module installed or removed. Memory is admitted over
+the union, cycles over the target, which is one Part. A pick naming a module
+no Part holds yet must fit beside all of them, or it is refused before
+anything changes. Anything else that does not fit (a bank that never fitted)
+falls back to loading what runs. A Part change within the preloaded set needs
+no DSP job, so it is ready inside its guard and runs in the same tick, as on
+stock; queued Part changes, which no guard covers yet, find their code bound.
+
+Emulator (`ot_emu --frame --dsp`), private base `02b3ed9d…` (`--dsp-loader
+--dev`), the Template Live copy, `scripts/verify-octatrack-dsp-loader.mjs`:
+
+- `queue`: E-Verb picked on FX2 of T1, then on the next three ticks E-Verb on
+  T5, E-Verb on T6 and FILTER on T6, while T1's upload ran. Three picks
+  waited and none was dropped or refused (requested 3, completed 3): T1 and
+  T5 run E-Verb, both cores hold it word for word (68 packets each), T6 runs
+  FILTER, and its E-Verb pick never reached the manager. The same run on
+  `dsp2-AB3` dropped three of the four picks (requested 4, cancelled 3): only
+  FILTER on T6 landed, and nothing was loaded.
+- `union`: with E-Verb and a second module installed (Air Chorus' package,
+  795 words, as a test fixture), Part 2's FX2 on T5 was set to E-Verb by a
+  poke (an unguarded route, as a paste or a project load would be): core 0
+  loaded it while T5 still ran Part 1. The Part change to Part 2 then sent no
+  packet to either core, and T5 ran E-Verb. Part 1's T3 set to the second
+  module: core 1 loaded it (35 packets). E-Verb picked on T2 was then refused
+  with `DSP MEMORY FULL` (1,588 + 795 words in a 2,174-word arena), though
+  nothing live held the other module, and T2 kept its effect.
+- Old projects (item D, `old_projects.py` module-restored): a project naming
+  E-Verb on T2 (core 1) and T6 (core 0) in every Part, with E-Verb installed
+  afterwards: both slots bound and started from their init (`dl_reinit` 2),
+  the Part records of all 16 banks and the live effects as on stock, no
+  transport errors. It passed on `dsp2-AB3` too. The earlier failures were
+  the scratch runner's: it mounted a deleted worktree and glued the
+  package's directory and path together, so nothing was installed.
+- Regressions on the same base: `pick`, `remove`, `cycles` and `missing`
+  passed.
+
+Limits: the stock setter runs with a waiting pick's track in the
+current-track byte for the length of the call, so another task reading that
+byte meanwhile sees the waiting pick's track; the saved Part copies (RELOAD)
+are not in the union; a Part change into a set that fits only after code is
+retired is refused, because the allocator never overwrites live code; and in
+`ot_emu` a second install right after the first timed out at ENTER unless a
+bench command came between (on `dsp2-AB3` too; not understood). No hardware
+run yet.
 
 ### Giving back PLATE, SPRING and DARK REV
 
