@@ -83,12 +83,15 @@ int modwerk_fxmap_handle(uint32_t module)
     for (unsigned k = 0; k < 32u; ++k) if (modwerk_dsp_modules >> k & 1u && MAP->e[k].module == module) return (int)k;
     return -1;
 }
-/* The name the map records at `id`, NUL-ended in `out` (16 bytes); "" none. */
+/* The name the map records at `id`, else today's catalogue name for it (no project loaded under this
+ * base yet), NUL-ended in `out` (16 bytes); "" none. */
 void modwerk_fxmap_name(unsigned id, char *out)
 {
     out[0] = 0;
-    if (id >= 32u || !valid()) return;
-    for (unsigned i = 0; i < 16u; ++i) out[i] = MAP->e[id].name[i];
+    if (id >= 32u) return;
+    if (valid() && MAP->e[id].module) for (unsigned i = 0; i < 16u; ++i) out[i] = MAP->e[id].name[i];
+    else for (unsigned i = 0; i < modwerk_fx_legacy_count; ++i)
+        if (modwerk_fx_legacy[i].id == id) for (unsigned c = 0; c < 16u; ++c) out[c] = modwerk_fx_legacy[i].name[c];
     out[15] = 0;
 }
 /* A module took handle `id` (dsp.c, at its switch): the map names it there. */
@@ -105,6 +108,7 @@ void modwerk_fxmap_assign(unsigned id, uint32_t module, unsigned layout, const c
 static struct fx_entry staged[32];
 static int staging;
 static unsigned lines;
+volatile uint32_t modwerk_fxmap_read, modwerk_fxmap_written; /* lines the last load took, the last save wrote */
 void modwerk_fxmap_begin(uint32_t storing)
 {
     if (!storing) return;
@@ -139,6 +143,7 @@ void modwerk_fxmap_loaded(int32_t result)
     if (!staging) return;
     staging = 0;
     if (result < 0) return; /* a failed load keeps the project that is still there */
+    modwerk_fxmap_read = lines;
     if (lines) for (unsigned k = 0; k < 32u; ++k) put(&MAP->e[k], staged[k].module, staged[k].layout, staged[k].name);
     else {
         for (unsigned k = 0; k < 32u; ++k) put(&MAP->e[k], 0, 0, 0);
@@ -150,6 +155,7 @@ void modwerk_fxmap_loaded(int32_t result)
 /* One line per handle the project uses: "#MODWERK_FX=27:873d83cc:1:E-Verb\r\n". */
 void modwerk_fxmap_write(uint32_t file)
 {
+    modwerk_fxmap_written = 0;
     if (!valid()) return;
     uint32_t used = modwerk_fxmap_used();
     for (unsigned k = 0; k < 32u; ++k) {
@@ -170,5 +176,6 @@ void modwerk_fxmap_write(uint32_t file)
         for (unsigned i = 0; i < 15u && MAP->e[k].name[i]; ++i) line[n++] = MAP->e[k].name[i];
         line[n++] = '\r', line[n++] = '\n';
         WRITE(file, line, n);
+        modwerk_fxmap_written = modwerk_fxmap_written + 1u;
     }
 }

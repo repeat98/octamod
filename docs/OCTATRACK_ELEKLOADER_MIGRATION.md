@@ -984,6 +984,35 @@ card, another unit) and change version, and old projects must keep loading:
   unused id has stock's NONE descriptor in both FX tables and dispatches to
   the null stub, so such a slot shows and runs as NONE and keeps its byte
   until edited (read from the stock tables, not yet run).
+- **Built (11 October 2026).** Packages carry the module's name and layout
+  number (ABI 6, `cb9e9f37`); the loader takes a module's effect id as its
+  preferred handle and the base gives the one it gets (`b0ab0b3a`). The map
+  (`fxmap.c`, `fxmap.s`, `51d1d6d2`) lives in battery RAM at `0x100fe000` (1
+  KiB, checksummed; nothing else uses it) and rides in `project.work` as
+  `#MODWERK_FX=<handle>:<module id>:<layout>:<name>` lines, one per handle the
+  project names in any bank. The base hooks stock's project loader
+  (`0x400866d4`), its `#` line check (`0x400867aa`), the writer (`0x400888b2`,
+  the seams PLAY MODES and SCALE QUANTIZER use) and the end of the engine's
+  project load (`0x4008540e`). A loaded project naming an installed module at
+  another handle, or another module at one it holds, rebinds in two steps: the
+  module lets go (its slots run dry while the manager retires its code), then
+  takes its handle once the manager is idle.
+  - Host test (`test_dsp.c`): lines in and out, legacy defaults, a failed load
+    changes nothing, handles follow the map, the two-step rebind.
+  - Emulator: E-Verb on both cores; an old project naming E-Verb without lines
+    runs its slots dry and reports it (`module-set`); installing the ABI 6
+    package restores both slots from init (`module-restored`).
+  - On the unit (`dsp3-M2`, base `be9dd505…`, flash-safety check passed): the
+    project still named E-Verb, not installed: its id ran dry and the unit
+    reported it. Installing it restored T2; picking it on T6 loaded it on core 0.
+    PROJECT > SYNC TO CARD wrote one `#MODWERK_FX` line, and PROJECT > CHANGE to
+    the same project read it back (map generation 2), with E-Verb still bound
+    and no errors. After a RAM boot (modules gone, battery RAM kept) the map was
+    still there and E-Verb's slots ran dry and were reported.
+  - Not yet: the popup's text on the unit (at boot it fires behind stock's
+    LOADING FILES bar, so it should show again once the unit is idle), a
+    missing-module request over USB for the site, rebinding on the unit, and
+    runtime chooser rows and parameter pages.
 - **What a project uses.** `modwerk_dsp_used()` reports the module effects
   the current bank names (what runs, and all four Parts, working and saved)
   as one bit per id, for an update to warn before it removes one. Other
