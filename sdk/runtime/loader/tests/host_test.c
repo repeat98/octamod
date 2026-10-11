@@ -264,6 +264,17 @@ int main(void)
     CHECK(b->prepare(0, p, n) && b->publish(0) == MU_APPLIED && b->retire(0) && dsp_switches == 2);
     fx = modwerk_runtime_module(0);
     CHECK(!strcmp(fx->dsp.name, "E-Verb") && fx->dsp.layout == 3 && dsp_to.layout == 3 && !strcmp(dsp_to.name, "E-Verb"));
+    CHECK(!fx->dsp.page);                                                          /* no page recipe flagged */
+    /* Flag 1 (ABI 6 only): the image starts with the machine's page recipe; other flags are refused. */
+    id = 40; begin5(4, 26, 5, 2);
+    memmove(p + 68, p + 50, n - 50); n += 18; p[5] = 6; p[7] = 1;
+    memcpy(p + 50, "E-Verb\0\0\0\0\0\0\0\0\0\0", 16); p[66] = 0; p[67] = 3;
+    dsp_words(5, reloc, 2);
+    CHECK(b->prepare(0, p, n) && b->publish(0) == MU_APPLIED && b->retire(0));
+    fx = modwerk_runtime_module(0);
+    CHECK(fx->dsp.page && fx->dsp.page == (const uint8_t *)fx + ((sizeof(struct runtime_module) + 15u) & ~15u) && dsp_to.page == fx->dsp.page &&
+          fx->dsp.page_bytes == 4);
+    p[7] = 2; CHECK(!b->prepare(0, p, n) && modwerk_runtime_refusal() == RUNTIME_MALFORMED);
     dsp_switches = 1;
     /* Malformed DSP sections change nothing. */
     for (unsigned bad = 0; bad < 6; ++bad) {

@@ -64,9 +64,13 @@ uint32_t modwerk_fxmap_generation(void);
 void modwerk_fxmap_assign(unsigned id, uint32_t module, unsigned layout, const char *name);
 void modwerk_fxmap_name(unsigned id, char *out);
 extern volatile uint32_t modwerk_fxmap_read, modwerk_fxmap_written;
+int modwerk_fxpage_build(unsigned id, uint8_t *recipe, uint32_t bytes, unsigned slots); /* fxpage.c */
+void modwerk_fxpage_drop(unsigned id);
 static uint32_t owner[32];
 static uint16_t owner_layout[32];
 static char owner_name[32][16];
+static uint8_t *owner_page[32]; /* its page recipe (the module image's head), and that image's length */
+static uint32_t owner_page_bytes[32];
 static unsigned rebinding; /* ticks into a rebind, 0 none */
 static int handle_of(uint32_t module)
 {
@@ -114,7 +118,15 @@ static void release(unsigned k)
 {
     dl_catalog[k] = unheld;
     dl_codes[0][k] = dl_codes[1][k] = (struct code){0, 0, 0, 0, 0, 0};
-    owner[k] = 0;
+    owner[k] = 0, owner_page[k] = 0;
+    modwerk_fxpage_drop(k);
+}
+/* Its page in the choosers at handle k, when it brought one (a module without one still runs where a
+ * project names it). */
+static void list(unsigned k, uint8_t *page, uint32_t bytes)
+{
+    owner_page[k] = page, owner_page_bytes[k] = bytes;
+    if (page) modwerk_fxpage_build(k, page, bytes, dl_catalog[k].slots);
 }
 void modwerk_machine_dsp_switch(const struct runtime_dsp *from, const struct runtime_dsp *to)
 {
@@ -127,6 +139,7 @@ void modwerk_machine_dsp_switch(const struct runtime_dsp *from, const struct run
             (struct code){to->words, to->relocations, (uint16_t)to->count, to->init, to->proc, to->relocation_count};
         owner[to->id] = to->module, owner_layout[to->id] = to->layout;
         for (unsigned i = 0; i < 16u; ++i) owner_name[to->id][i] = to->name[i];
+        list(to->id, (uint8_t *)(uintptr_t)to->page, to->page_bytes);
         modwerk_fxmap_assign(to->id, to->module, to->layout, to->name);
         nudge = 1; /* tracks may already name it (a saved project): load it there now */
     }
@@ -134,7 +147,7 @@ void modwerk_machine_dsp_switch(const struct runtime_dsp *from, const struct run
 /* A project load can name an installed module at another handle, or another module at the handle one
  * holds. Those modules let go first: the manager retires their code, so no slot runs the wrong module.
  * Once it is idle, each takes the handle the map gives it (choose); one that finds none stays out. */
-static struct { struct dl_package package; struct code code[2]; uint32_t module; uint16_t layout; char name[16]; } moving[32];
+static struct { struct dl_package package; struct code code[2]; uint32_t module, page_bytes; uint8_t *page; uint16_t layout; char name[16]; } moving[32];
 static unsigned moving_count;
 static uint32_t mapped; /* the map generation the handles follow */
 static void rebind_tick(void)
@@ -153,6 +166,7 @@ static void rebind_tick(void)
             moving[moving_count].package = dl_catalog[k];
             moving[moving_count].code[0] = dl_codes[0][k], moving[moving_count].code[1] = dl_codes[1][k];
             moving[moving_count].module = owner[k], moving[moving_count].layout = owner_layout[k];
+            moving[moving_count].page = owner_page[k], moving[moving_count].page_bytes = owner_page_bytes[k];
             for (unsigned i = 0; i < 16u; ++i) moving[moving_count].name[i] = owner_name[k][i];
             ++moving_count;
             release(k);
@@ -168,6 +182,7 @@ static void rebind_tick(void)
         dl_codes[0][id] = moving[i].code[0], dl_codes[1][id] = moving[i].code[1];
         owner[id] = moving[i].module, owner_layout[id] = moving[i].layout;
         for (unsigned c = 0; c < 16u; ++c) owner_name[id][c] = moving[i].name[c];
+        list((unsigned)id, moving[i].page, moving[i].page_bytes);
         if (modwerk_fxmap_handle(moving[i].module) != id) modwerk_fxmap_assign((unsigned)id, moving[i].module, moving[i].layout, moving[i].name);
     }
     mapped = modwerk_fxmap_generation();
@@ -393,10 +408,13 @@ static void peek_tick(void)
         peeking = -1; /* the manager or a probe took the core: keep what was read */
 }
 #endif
+void modwerk_dsp_unpack(void); /* identity.c: the stock effects' code into RAM, before the manager needs it */
 void modwerk_dsp_tick(void)
 {
     modwerk_dsp_watch_ticks = modwerk_dsp_watch_ticks + 1; /* the watchdog's heartbeat */
 #ifndef MODWERK_HOST
+    static int unpacked;
+    if (!unpacked) unpacked = 1, modwerk_dsp_unpack();
     peek_tick();
     if (probing >= 0 && dl_job_status((unsigned)probing) != 0) {
         if (dl_job_status((unsigned)probing) > 0) modwerk_dsp_probes_ok = modwerk_dsp_probes_ok + 1;

@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 const struct fx_legacy modwerk_fx_legacy[] = {{0x873d83ccu, 27, "E-Verb"}};
+int modwerk_fxpage_build(unsigned id, uint8_t *recipe, uint32_t bytes, unsigned slots) { (void)id; (void)recipe; (void)bytes; (void)slots; return 1; }
+void modwerk_fxpage_drop(unsigned id) { (void)id; }
 const uint32_t modwerk_fx_legacy_count = 1;
 static char written[256];
 static int capture(uint32_t file, const void *data, unsigned length)
@@ -31,8 +33,8 @@ int main(void)
 {
     static const uint32_t words[3] = {1, 2, 3};
     static const uint16_t relocations[1] = {0};
-    struct runtime_dsp none = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ""};
-    struct runtime_dsp fx = {words, relocations, 3, 1, 1, 2, 244, 0, 26, 1, RUNTIME_MODELED, 70, 70, 1, "Test FX"};
+    struct runtime_dsp none = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", 0, 0};
+    struct runtime_dsp fx = {words, relocations, 3, 1, 1, 2, 244, 0, 26, 1, RUNTIME_MODELED, 70, 70, 1, "Test FX", 0, 0};
     CHECK(modwerk_machine_dsp_admit(&none, &none) == RUNTIME_OK && modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_OK);
     /* The effect id is a handle: the preferred one when it is a free module id, else the lowest free module id. */
     fx.id = 27; CHECK(modwerk_machine_dsp_admit(&none, &fx) == RUNTIME_OK && fx.id == 27);

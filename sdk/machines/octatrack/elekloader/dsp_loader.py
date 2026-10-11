@@ -10,7 +10,7 @@ effect becomes a package recovered from the user's own firmware with
 Modwerk's relocation recipes (src/engine/assets/stock-dsp-metadata.json,
 checked against their hashes), and its dispatch is stock's null stub until it
 is bound. Octabam's DSP DYNLOAD STOCK is the reference for the layout. Module
-FX appear in the stock choosers (scripts/octatrack-base-choosers.mjs).
+FX join the stock choosers when they register (fxpage.c builds their pages).
 """
 import hashlib
 import json
@@ -24,8 +24,6 @@ APP = HERE.parents[3]
 RECEIVER = HERE / 'dsp_receiver.asm'  # Octabam's receiver, answering through the host flags
 METADATA = APP / 'src/engine/assets/stock-dsp-metadata.json'
 CHOOSERS = APP / 'src/engine/assets/chooser-metadata.json'
-CHOOSERS_SCRIPT = APP / 'scripts/octatrack-base-choosers.mjs'
-MODULES = ('everb', 'miniverb', 'tapehead', 'airwindows-chorus', 'spectrum', 'modulation')  # module FX with a chooser row in this base, each loaded as a package
 FRAME = {'A': 0x8e, 'B': 0x76}  # `move r6,x:>$207` at the head of each core's frame (dsp-dynload's hooks)
 FRAME_WORDS = (0x667000, 0x000207)
 INIT, PROC = 0x215, 0x235  # the shared dispatch table: init[32], then proc[32]
@@ -238,11 +236,21 @@ def catalog_c(layout, reserve):
             {fx: (len(w), b['stock'][fx]['slots']) for fx, w in b['words'].items()} or a['reads'] != b['reads']:
         raise ValueError('The two payloads package the stock effects differently.')
     lines = ['struct code { const uint32_t *words; const uint16_t *relocations; uint16_t count, init, proc, relocation_count; };']
+    unpack = []
     for n, tag in enumerate('AB'):
         for fx, words in sorted(layout[tag]['words'].items()):
-            lines.append('static const uint32_t stock%d_%d[] = {%s};' % (n, fx, ','.join('%#x' % w for w in words)))
+            # Three bytes a word in the image (a RAM-booted base has 1.25 MiB), unpacked into RAM at the first tick.
+            lines.append('static const uint8_t stock%d_%d_packed[] = {%s};' % (
+                n, fx, ','.join('%#x' % (w >> s & 255) for w in words for s in (16, 8, 0))))
+            lines.append('static uint32_t stock%d_%d[%d];' % (n, fx, len(words)))
             lines.append('static const uint16_t stock%d_%d_relocations[] = {%s};' % (
                 n, fx, ','.join(str(r) for r in layout[tag]['stock'][fx]['relocations']) or '0'))
+            unpack.append('{stock%d_%d_packed, stock%d_%d, %d}' % (n, fx, n, fx, len(words)))
+    lines.append('void modwerk_dsp_unpack(void) {')
+    lines.append('    static const struct { const uint8_t *from; uint32_t *to; uint32_t count; } all[] = {%s};' % ', '.join(unpack))
+    lines.append('    for (unsigned i = 0; i < sizeof all / sizeof *all; ++i) for (uint32_t w = 0; w < all[i].count; ++w)')
+    lines.append('        all[i].to[w] = (uint32_t)all[i].from[3 * w] << 16 | (uint32_t)all[i].from[3 * w + 1] << 8 | all[i].from[3 * w + 2];')
+    lines.append('}')
     lines.append('struct dl_package dl_catalog[32] = {%s};' % ', '.join(
         '{%d, 1, %d, %d, %d, 1, %d}' % ((len(a['words'][fx]), reserve, a['stock'][fx]['slots'], 0, a['reads'][fx]) if fx in a['stock']
                                         else (0, reserve, 3, 1, a['reads'][fx])) for fx in range(32)))
@@ -256,17 +264,33 @@ def catalog_c(layout, reserve):
     return '\n'.join(lines) + '\n'
 
 
-def choosers(image, node='node'):
-    """Modwerk's chooser composer (CHOOSERS_SCRIPT): the module rows join every stock row. -> (sites, chooser)."""
-    out = subprocess.run([node, str(CHOOSERS_SCRIPT), json.dumps(dict(modules=MODULES))],
-                         input=image, capture_output=True, check=True)
-    result = json.loads(out.stdout)
+def choosers(image):
+    """The stock FX choosers, read from the base's own lists, which fxpage.c extends with each module that
+    registers: -> (sites pointing stock's references at them and giving the module ids no descriptor and no
+    row yet, the lists' C definitions with stock's rows). Read from the user's firmware."""
+    meta = json.loads(CHOOSERS.read_text())
+    layout = meta['layout']
+    read = lambda at: int.from_bytes(image[at - 0x40000400:at - 0x40000400 + 4], 'big')
+    lists = {}
+    for slot, at in (('fx1', layout['FX1_LIST']), ('fx2', layout['FX2_LIST'])):
+        rows = []
+        while read(at + 4 * len(rows)) and len(rows) < 32:
+            rows.append(read(at + 4 * len(rows)))
+        lists[slot] = rows
+    none = read(layout['FX1_IDS'])
+    if none != layout['FX1_NONE'] or any(rows[0] != none or len(rows) > 31 - 13 for rows in lists.values()):
+        raise ValueError('The stock FX choosers are not the lists the base extends.')
     sites = []
-    for write in result['writes']:
-        offset, new = write['address'] - 0x40000400, bytes.fromhex(write['bytes'])
-        guarded = image[offset:offset + write['guardLength']]
-        if hashlib.sha256(guarded).hexdigest() != write['guardSha256'] or len(new) > len(guarded):
-            raise ValueError('A chooser write does not match the stock image at %#x.' % write['address'])
-        sites.append(dict(addr=hex(write['address']), stock=image[offset:offset + len(new)].hex(), op='bytes',
-                          kind='data', new=new.hex()))
-    return sites, result['chooser']
+    for slot, at, symbol in (('fx1', layout['FX1_LIST'], 'modwerk_fx1_list'), ('fx2', layout['FX2_LIST'], 'modwerk_fx2_list')):
+        for ref in meta[slot + 'References']:
+            if read(ref) != at:
+                raise ValueError('A stock chooser reference at %#x does not name its list.' % ref)
+            sites.append(dict(addr=hex(ref), stock=image[ref - 0x40000400:ref - 0x40000400 + 4].hex(), op='ptr', target=symbol))
+    for fx in meta['customIds']:
+        for table, value in ((layout['FX1_IDS'], none), (layout['FX2_IDS'], none), (layout['FX1_ID2POS'], 0), (layout['ID2POS'], 0)):
+            at = table + 4 * fx
+            sites.append(dict(addr=hex(at), stock=image[at - 0x40000400:at - 0x40000400 + 4].hex(), op='bytes', kind='data',
+                              new=value.to_bytes(4, 'big').hex()))
+    c = ''.join('uint32_t modwerk_%s_list[32] = {%s};\n' % (slot, ', '.join('%#xu' % row for row in rows)) for slot, rows in lists.items())
+    c += 'const uint32_t modwerk_fx_rows[2] = {%d, %d};\n' % (len(lists['fx1']), len(lists['fx2']))
+    return sites, c

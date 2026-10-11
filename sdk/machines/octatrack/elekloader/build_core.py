@@ -510,14 +510,14 @@ def main():
             (source / ('dsp_hooks.s' if name == 'hooks.s' else name)).write_text(text)
         shutil.copyfile(HERE / 'dsp.c', source / 'dsp.c')
         shutil.copyfile(HERE / 'dsp_core1.s', source / 'dsp_core1.s')
-        for name in ('fxmap.c', 'fxmap.s'):
+        for name in ('fxmap.c', 'fxmap.s', 'fxpage.c'):
             shutil.copyfile(HERE / name, source / name)
         for lea, stock_list in ((0x40052496, 0x400d6090), (0x40052706, 0x400d6060)):
             if int.from_bytes(image[lea - device.main_load:lea - device.main_load + 4], 'big') != stock_list:
                 raise ValueError('An FX selector no longer reads its chooser list at %#x.' % lea)
         dsp_sites, dsp_layout = loader_dsp.recipe(image, device, dsp, lambda path: sdk.dsp_assemble(path, str(source)), str(source),
                                                   args.dsp_probe if args.dsp_probe in ('A', 'B') else None, args.dsp_burn)
-        chooser_sites, rows = loader_dsp.choosers(image)
+        chooser_sites, chooser_lists = loader_dsp.choosers(image)
         dsp_sites += chooser_sites
     (source/'usb_base.h').write_text(usb.header())
     (source/'usb_base.s').write_text(usb.assembly(args.dev))
@@ -533,7 +533,7 @@ def main():
             inputs[str(path.relative_to(APP))] = sha(path.read_bytes())
     if args.dsp_loader:
         for name in ('src/engine/assets/stock-dsp-metadata.json', 'src/engine/assets/chooser-metadata.json',
-                     'src/engine/choosers.ts', 'src/engine/module-menus.ts', 'scripts/octatrack-base-choosers.mjs'):
+                     'scripts/octatrack-module-page.mjs'):
             inputs[name] = sha((APP / name).read_bytes())
     inputs.update({'elekloader/' + p.name: sha(p.read_bytes()) for p in original_core.iterdir() if p.is_file()})
     artwork = APP / 'sdk/runtime/startup/artwork.json'
@@ -546,8 +546,7 @@ def main():
                          usb=dict(interfaces=['msc', 'modwerk-vendor'], vendor=1, submit=True, backend='runtime-loader-3'),
                          boot='ram-1', **({'dev': ['key', 'panel', 'state', 'screen', 'usb-audio-main-cue']} if args.dev else {}))
     if args.dsp_loader:
-        configuration.update(fx1=['NONE', *rows['fx1']], fx2=['NONE', *rows['fx2']],
-                             dsp=dict(loader='dsp-dynload-2', stock='on-demand', rows=list(loader_dsp.MODULES),
+        configuration.update(dsp=dict(loader='dsp-dynload-3', stock='on-demand', rows='runtime',
                                       allowance=DSP_ALLOWANCE, reserve=DSP_RESERVE, probe=args.dsp_probe, burn=args.dsp_burn, hook=args.dsp_hook, arena=[dsp_layout[t]['tableWords'] - loader_dsp.SAVED for t in 'AB']))
     identity = sha(json.dumps(configuration, separators=(',', ':')).encode())
     values = dict(build=identity[:16], os='1.40C', modules='', configuration=identity,
@@ -576,7 +575,7 @@ def main():
         definitions += 'const struct fx_legacy modwerk_fx_legacy[] = {%s};\nconst uint32_t modwerk_fx_legacy_count = %d;\n' % (
             ', '.join('{%#xu, %d, %s}' % (int.from_bytes(hashlib.sha256(key.encode()).digest()[:4], 'big'), fx,
                                            ctext(names.get(key, key)[:15])) for fx, key in legacy), len(legacy))
-        definitions += loader_dsp.catalog_c(dsp_layout, DSP_RESERVE)
+        definitions += loader_dsp.catalog_c(dsp_layout, DSP_RESERVE) + chooser_lists
         definitions += 'const uint16_t modwerk_dsp_arena[2] = {%d, %d};\n' % tuple(
             dsp_layout[t]['tableWords'] - loader_dsp.SAVED for t in ('A', 'B'))
     (source/'identity.c').write_text(definitions)

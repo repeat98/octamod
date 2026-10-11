@@ -207,7 +207,7 @@ static int prepare(void *u, const uint8_t *data, uint32_t length)
     (void)u;
     candidate = 0; prepared = 0; refusal = RUNTIME_OK;
     if (length < 28u || data[0] != 'M' || data[1] != 'W' || data[2] != 'R' || data[3] != 'M' || be16(data + 4) < 3u ||
-        be16(data + 4) > 6u || be16(data + 6)) return refuse(RUNTIME_MALFORMED);
+        be16(data + 4) > 6u || be16(data + 6) & ~(be16(data + 4) == 6u ? 1u : 0u)) return refuse(RUNTIME_MALFORMED);
     uint32_t abi = be16(data + 4), header = abi == 6 ? RUNTIME_HEADER_BYTES : abi == 5 ? 50u : abi == 4 ? 32u : 28u;
     if (length < header) return refuse(RUNTIME_MALFORMED);
     uint32_t image = be32(data + 8), bss = be32(data + 12), count = be32(data + 16), hooks = be32(data + 20),
@@ -292,6 +292,7 @@ static int prepare(void *u, const uint8_t *data, uint32_t length)
         for (uint32_t i = 0; i < dsp.count; ++i) dsp_words[i] = be32(words + 4u * i);
         for (uint32_t i = 0; i < dsp.relocation_count; ++i) dsp_relocations[i] = (uint16_t)be16(dsp_relocation + 2u * i);
         dsp.words = dsp_words; dsp.relocations = dsp_relocations;
+        if (be16(data + 6) & 1u) dsp.page = to, dsp.page_bytes = image; /* a page recipe heads the image; the machine checks it */
         m->id = id; m->size = head + code + tail; m->dsp = dsp;
         for (uint32_t i = 0; i < RUNTIME_EVENTS; ++i) m->hook[i] = hook[i] == RUNTIME_NONE ? 0 : (uintptr_t)to + hook[i];
         m->site = site; m->sites = sites;

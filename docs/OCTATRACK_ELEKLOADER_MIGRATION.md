@@ -1022,8 +1022,32 @@ card, another unit) and change version, and old projects must keep loading:
     every module the project names in any bank that nothing installed answers
     for. On the unit: `[{handle: 27, layout: 1, module: 873d83cc, name:
     E-Verb}]` (`npm run device -- missing`).
-  - Not yet: rebinding on the unit, the site using MISSING, and runtime chooser
-    rows and parameter pages.
+  - **Chooser rows and FX pages at runtime** (`dsp3-R1`, base `f58b9ecf…`, 11
+    October 2026). A package now carries its page as a recipe (ABI 6 flag 1, the
+    module image's head; `build.py` from the catalogue's descriptor and menu
+    recipes through `scripts/octatrack-module-page.mjs`): the stock donor
+    descriptor's address and SHA-256, the integer and text patches, the
+    inherited enable bits and each formatter's code, with its module-relative
+    relocations (for the loader) and descriptor-relative fixups (for the base).
+    No stock bytes. When the module registers, `fxpage.c` checks the donor
+    against its hash in the running firmware, builds the 0x192-byte descriptor
+    in base RAM, gives it the module's handle as its effect id, fixes up the
+    formatters and lists it: the choosers read the base's own lists (the build
+    points stock's six references at them), and FX1_IDS, FX2_IDS, FX1_ID2POS and
+    ID2POS name each module id's descriptor and row. The base no longer composes
+    module rows into the image; `octatrack-base-choosers.mjs` is gone. A recipe
+    that reaches past its image or names the wrong donor is refused. The stock
+    effects' code is stored three bytes a word and unpacked at the first tick:
+    the image had passed the 1.25 MiB a RAM boot takes.
+    - Host test `test_fxpage.c`; the loader's host test covers the flag.
+    - On the unit: FX2 ended at DARK REV with E-Verb missing; installing it
+      added an `E-Verb` row after DARK REV; picking it loaded it on core 0 with
+      its own pages (TILT PRE REV EDCY ESIZ; SIZE DCY ABSB DPTH SPD MIX), and its
+      REV formatter, module code, showed `OFF` and `ON`. With no track running it,
+      removing it freed core 0 and took the row away.
+  - Not yet: rebinding on the unit, the site using MISSING, the other modules'
+    pages on the unit (Spectrum and Tape Echo carry formatter units with
+    fixups), and EUCLID's shared wide dial.
 - **What a project uses.** `modwerk_dsp_used()` reports the module effects
   the current bank names (what runs, and all four Parts, working and saved)
   as one bit per id, for an update to warn before it removes one. Other

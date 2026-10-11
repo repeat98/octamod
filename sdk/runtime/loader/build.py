@@ -79,7 +79,7 @@ def module_id(name):
     return int.from_bytes(hashlib.sha256(name.encode()).digest()[:4], 'big')
 
 
-def package(image, bss, hooks, offsets, sites=(), name='', dsp=None):
+def package(image, bss, hooks, offsets, sites=(), name='', dsp=None, flags=0):
     """sites: (address, stock bytes, new bytes, offsets of self-references in them); dsp: dsp_section()'s."""
     records = b''
     for address, stock, code, local in sites:
@@ -92,8 +92,45 @@ def package(image, bss, hooks, offsets, sites=(), name='', dsp=None):
                             dsp['init'], dsp['proc'], dsp['cycles'], dsp['kind'], dsp['state'], dsp['buffer'])
         head += dsp['name'].encode().ljust(16, b'\0') + struct.pack('>H', dsp['layout'])
         records += struct.pack('>%dI' % len(dsp['words']), *dsp['words']) + struct.pack('>%dH' % len(dsp['relocations']), *dsp['relocations'])
-    return (b'MWRM' + struct.pack('>HH', 6 if dsp else 4, 0) + head + struct.pack('>%dI' % len(hooks), *hooks) + image
+    return (b'MWRM' + struct.pack('>HH', 6 if dsp else 4, flags) + head + struct.pack('>%dI' % len(hooks), *hooks) + image
             + struct.pack('>%dI' % len(offsets), *offsets) + records)
+
+
+PAGE_MAGIC = b'MWPG'
+
+
+def page_section(module_id):
+    """(image, relocations): the Octatrack effect page recipe scripts/octatrack-module-page.mjs makes, laid out
+    for the base's fxpage.c (big-endian): 'MWPG', the donor descriptor's address and SHA-256, the slots whose
+    enable bits it inherits, the counts, a word the base keeps (where the fixups point), the integer patches
+    (offset, width, value), the text patches (offset, width, length, text), the formatters (slot, fixups,
+    clear-widget, code pointer, code length, fixup offsets), then each formatter's code. No stock bytes."""
+    out = subprocess.run(['node', str(Path(__file__).resolve().parents[3] / 'scripts/octatrack-module-page.mjs'), module_id],
+                         capture_output=True, text=True)
+    if out.returncode:
+        raise ValueError('No FX page for %s: %s' % (module_id, out.stderr.strip().splitlines()[-1] if out.stderr.strip() else '?'))
+    page = json.loads(out.stdout)
+    inherited = sum(1 << slot for slot in page['inheritedEnable'])
+    head = PAGE_MAGIC + struct.pack('>I', page['donor']) + bytes.fromhex(page['donorSha256']) + struct.pack(
+        '>HBBBBHI', inherited, len(page['integers']), len(page['strings']), len(page['formatters']), 0, 0, 0)
+    body = b''.join(struct.pack('>HBBI', f['offset'], f['width'], 0, f['value']) for f in page['integers'])
+    for f in page['strings']:
+        text = f['value'].encode('latin-1')
+        entry = struct.pack('>HBB', f['offset'], f['width'], len(text)) + text
+        body += entry + b'\0' * (-len(entry) % 4)
+    entries, at = [], len(head) + len(body)
+    for f in page['formatters']:
+        entries.append(struct.pack('>BBBBIHH', f['slot'], len(f['fixups']), int(f['clearWidget']), 0, 0, len(f['code']) // 2, 0) +
+                       struct.pack('>%dH' % len(f['fixups']), *f['fixups']))
+        entries[-1] += b'\0' * (-len(entries[-1]) % 4)
+    image, relocations = bytearray(head + body + b''.join(entries)), []
+    for f, entry_at in zip(page['formatters'], [at + sum(len(e) for e in entries[:i]) for i in range(len(entries))]):
+        code = bytes.fromhex(f['code'])
+        struct.pack_into('>I', image, entry_at + 4, len(image))       # the loader adds the module's address
+        relocations.append(entry_at + 4)
+        relocations += [len(image) + r for r in f['relocations']]
+        image += code + b'\0' * (-len(code) % 4)
+    return bytes(image), sorted(relocations)
 
 
 def dsp_section(pkg, slots, cycles, kind, state, buffer=0, name='', layout=1):
@@ -248,6 +285,7 @@ def main():
     parser.add_argument('--buffer', type=int, default=0, help='Y words of the slot buffer the effect reads from its base')
     parser.add_argument('--name', help='the display name projects record it by (default: its catalogue name)')
     parser.add_argument('--layout', type=int, default=1, help='parameter-layout number: raise it when stored values change meaning')
+    parser.add_argument('--no-page', action='store_true', help='leave out the effect page recipe (no chooser row on the unit)')
     args = parser.parse_args()
     if (bool(args.sources) and bool(args.elemod)) or not (args.sources or args.elemod or args.dsp) or (args.elemod and args.dsp):
         parser.error('Give C sources, --elemod or --dsp.')
@@ -267,7 +305,8 @@ def main():
     elif args.sources:
         data = build_c(args.sources, args.cross, args.output.stem, dsp)
     else:
-        data = package(b'', 0, [], [], name=pkg.get('id', args.output.stem), dsp=dsp)
+        image, relocations = page_section(pkg['id']) if 'id' in pkg and not args.no_page else (b'', [])
+        data = package(image, 0, [], relocations, name=pkg.get('id', args.output.stem), dsp=dsp, flags=1 if image else 0)
     args.output.write_bytes(data)
     image, bss, count, hooks, sites, ident = struct.unpack_from('>IIIIII', data, 8)
     header = 68 if dsp else 32

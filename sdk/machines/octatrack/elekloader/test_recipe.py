@@ -221,6 +221,9 @@ class RuntimeSlotTests(unittest.TestCase):
     def test_dsp_effect_glue_on_the_host(self):
         self.host_test('test_dsp.c')
 
+    def test_fx_pages_on_the_host(self):
+        self.host_test('test_fxpage.c')
+
 
 
 class DspLoaderTests(unittest.TestCase):

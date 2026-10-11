@@ -48,11 +48,12 @@ const build = dir => ({ proofs: json(join(dir, 'proofs.json')), symbols: json(jo
 const [scenario, module = 'everb'] = (args[2] ?? '').split(':')
 const pkg = json(new URL('../src/engine/assets/dsp-packages.json', import.meta.url)).packages.find(p => p.id === module)
 const EFFECT = pkg?.fxId
-// The module's slot (0 FX1, 1 FX2) and chooser row: FX2 where it has a row, or FX1 first.
+// The module's slot (0 FX1, 1 FX2) and chooser row: the base lists an installed module after the stock rows
+// (fxpage.c), and these scenarios install one. FX2 where it serves, or FX1 first.
+const served = json(new URL('../src/engine/assets/chooser-metadata.json', import.meta.url)).modules.find(m => m.id === module)
 const place = (proofs, fx1First) => {
-  const rows = [proofs.configuration.fx1.indexOf(pkg.key), proofs.configuration.fx2.indexOf(pkg.key)]
-  const slot = fx1First ? (rows[0] > 0 ? 0 : 1) : (rows[1] > 0 ? 1 : 0)
-  return [slot, rows[slot]]
+  const serves = [!!served?.fx1, !served?.fx1Only], slot = fx1First ? (serves[0] ? 0 : 1) : (serves[1] ? 1 : 0)
+  return [slot, (slot ? proofs.configuration.fx2 : proofs.configuration.fx1).length]
 }
 
 if (mode === 'dumps') {

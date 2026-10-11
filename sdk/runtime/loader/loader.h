@@ -37,6 +37,9 @@ struct runtime_dsp {
     uint16_t layout;                 /* what its stored parameter values mean; a change that reads them
                                       * differently raises it (ABI 6; 0 from ABI 5) */
     char name[16];                   /* its display name, NUL-ended (ABI 6; empty from ABI 5) */
+    const uint8_t *page;             /* the module image's head, when the package's flag 1 says it
+                                      * starts with the effect's page recipe for the machine (ABI 6) */
+    uint32_t page_bytes;             /* the image's length, all the recipe may reach */
 };
 enum runtime_cycles { RUNTIME_EXECUTED = 1, RUNTIME_MODELED, RUNTIME_HARDWARE };
 /* At the start of the module's pool extent, followed by its sites, code, data, bss and DSP code. */
