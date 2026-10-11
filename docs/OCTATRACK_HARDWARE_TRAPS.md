@@ -149,6 +149,13 @@ What `ot_emu` does not show:
 - `--dsp` dies with a bus error in Docker unless `--shm-size=128m`;
   `--frame` is needed for the audio producer (USB audio) to run.
 
+**Drive the unit in one connection and read it as text.** Each `npm run
+device` call opens the bridge again (about a second). `npm run device -- do
+'T1 FX2 FUNC+FX2 DOWN*8 YES w1500 NO ui'` runs a whole sequence in one
+connection, and `ui` prints each track's effects, the current track and the
+transport from RAM (the development MEM request, read-only, RAM only). Take a
+screenshot only for menus `ui` cannot name, at `--scale 2`.
+
 Tools that work on this Mac:
 - Development bases (`build_core.py --dev`): `npm run device -- key`,
   `enc`, `fader`, `state`, `screen [--png FILE]`, `loader`, `report`,

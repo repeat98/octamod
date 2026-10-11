@@ -1045,6 +1045,12 @@ card, another unit) and change version, and old projects must keep loading:
       its own pages (TILT PRE REV EDCY ESIZ; SIZE DCY ABSB DPTH SPD MIX), and its
       REV formatter, module code, showed `OFF` and `ON`. With no track running it,
       removing it freed core 0 and took the row away.
+  - **E-Verb's sound on the unit** (`dsp3-R2`, 11 October 2026). A clap from the
+    card on T1 (core 1, steps 1 and 9) and T5 (core 0, steps 5 and 13), main out
+    recorded over USB audio for 8 s, E-Verb on both FX2 slots against NONE: after
+    each of the 16 hits the level 200 ms later was -13.9 dB with E-Verb and
+    -41.2 dB dry, 400 ms later -37.4 dB against silence. Both cores reverberate.
+    Set up and run entirely from the Mac (`npm run device -- do`, `ui`).
   - Not yet: rebinding on the unit, the site using MISSING, the other modules'
     pages on the unit (Spectrum and Tape Echo carry formatter units with
     fixups), and EUCLID's shared wide dial.
@@ -1479,6 +1485,9 @@ The owner has not decided whether to do this. If yes:
   the pilot passes on the unit, and the union of a bank's Parts is preloaded.
 - Whether the selected module set persists across a power cycle (read from
   the card at boot); a plan is above.
+- Decided (11 October 2026): preloading the modules a bank's Parts name may
+  refuse a pick sooner (the owner accepts it), and installed modules survive a
+  power cycle (read from the card at boot; to build).
 - Decided (11 October 2026): effect ids are per-project handles named by a
   map file in each project's folder; today's assignments are the default for
   projects without one; missing modules are reported by name and run dry.

@@ -17,6 +17,11 @@
  *          modwerk_dsp_probe(core), one no-op packet; replies its result.
  *   METER  0xC1, bRequest 13, wValue = core 0/1, wLength 1 (--dsp-loader): read the
  *          load meter's last window back (REPORT shows it); replies 1 when started.
+ *   MEM    0xC1, bRequest 15, wValue = an address's high half, wLength 1: kept for MEM;
+ *          bRequest 16, wValue = its low half, wLength 1-511 but never a multiple of 64: that
+ *          many bytes from there, for the host to decode the UI (device.mjs ui). Read-only, and
+ *          only RAM the base knows is RAM: the OS image and base, stock's variables, the
+ *          0x80000000 block and battery RAM. Anything else is not answered.
  *   SCREEN 0xC1, bRequest 7, wValue 0, wLength 1028: "MWLC" and the last
  *          composed 128x64 frame (ev_draw: 8 bytes a column, bit 7 = row 0).
  *
@@ -36,6 +41,14 @@ extern volatile uint32_t modwerk_dsp_missing;
 
 #define UNCACHED(p) ((uint8_t *)((uintptr_t)(p) + 0x08000000u))
 
+static uint32_t mem_high;
+static int ram(uint32_t at, uint32_t n)
+{
+    static const uint32_t spans[4][2] = {{0x40000400u, 0x40c50000u}, {0x46000000u, 0x47000000u},
+                                         {0x80000000u, 0x80010000u}, {0x100f0000u, 0x10100000u}};
+    for (unsigned i = 0; i < 4u; ++i) if (at >= spans[i][0] && at + n <= spans[i][1] && at + n > at) return 1;
+    return 0;
+}
 /* One 4 KiB page: usb_ep0_send fills only the first page of its descriptor. */
 static uint8_t screen[1028] __attribute__((aligned(2048)));
 
@@ -59,6 +72,19 @@ uint32_t modwerk_dev_request(const uint8_t *s, const uint8_t **reply, uint8_t *o
         out[0] = 1;
         *reply = out;
         return 1;
+    }
+    if (s[1] == 15 && want == 1) {
+        mem_high = s[2] | (uint32_t)s[3] << 8;
+        out[0] = 1;
+        *reply = out;
+        return 1;
+    }
+    if (s[1] == 16 && want && want < 512u && want % 64u) {
+        uint32_t at = mem_high << 16 | s[2] | (uint32_t)s[3] << 8;
+        if (!ram(at, want)) return 0;
+        for (uint32_t i = 0; i < want; ++i) out[i] = ((const volatile uint8_t *)(uintptr_t)at)[i];
+        *reply = out;
+        return want;
     }
     if (s[1] == 6 && want == 2 && !s[2] && !s[3]) {
         out[0] = (uint8_t)modwerk_machine_stopped();

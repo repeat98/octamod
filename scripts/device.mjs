@@ -10,7 +10,10 @@
 //   npm run device -- lifecycle
 //   npm run device -- boot BUILD_DIR       # RAM boot: build_core.py's output, no flashing
 //   npm run device -- key PLAY | FUNC+PLAY | 0x27   # development bases (build_core.py --dev)
-//   npm run device -- screen [--png FILE]           # the display, in block characters or as a 4x PNG
+//   npm run device -- screen [--png FILE] [--scale 1-4]  # the display, in block characters or as a PNG (4x unless --scale)
+//   npm run device -- ui                            # tracks, effects and transport as text, read from RAM (MEM)
+//   npm run device -- do 'T5 FX2 FUNC+FX2 DOWN*4 YES w300 encC+3 ui'  # a sequence in one connection
+//   npm run device -- mem 0x80000ec4 16             # RAM, read-only (development bases)
 //   npm run device -- state                         # stopped / playing, recording
 //   npm run device -- loader                        # the DSP loader's counters (--dsp-loader bases)
 //   npm run device -- report                        # its full report (dsp.c modwerk_dsp_report, version 9: 63 words; miss0-2 the first refused packet (dsp_receiver.asm))
@@ -40,12 +43,13 @@ const { values, positionals: [command, file] } = parseArgs({ allowPositionals: t
   accept: { type: 'boolean', default: false },
   emulator: { type: 'boolean', default: false },
   png: { type: 'string' },
+  scale: { type: 'string', default: '4' },
 } })
 const seconds = Number(values.seconds)
-if (!['status', 'try', 'remove', 'lifecycle', 'boot', 'key', 'screen', 'state', 'enc', 'fader', 'loader', 'report', 'probe', 'meter', 'missing'].includes(command) || (['try', 'boot', 'key', 'enc', 'fader', 'probe', 'meter'].includes(command) && !file) ||
-  (['status', 'lifecycle', 'screen', 'state', 'loader', 'report', 'missing'].includes(command) && file) ||
+if (!['status', 'try', 'remove', 'lifecycle', 'boot', 'key', 'screen', 'state', 'enc', 'fader', 'loader', 'report', 'probe', 'meter', 'missing', 'ui', 'do', 'mem'].includes(command) || (['try', 'boot', 'key', 'enc', 'fader', 'probe', 'meter', 'do', 'mem'].includes(command) && !file) ||
+  (['status', 'lifecycle', 'screen', 'state', 'loader', 'report', 'missing', 'ui'].includes(command) && file) ||
   !Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
-  console.error('Usage: device.mjs status | try MODULE.mwrm [--seconds 1-3600] [--accept] | remove [MODULE.mwrm] [--accept] | lifecycle | boot BUILD_DIR | key NAME[+NAME] | screen | state | loader | report | probe 0|1 | meter 0|1 | missing | enc A+3 | fader 0-255 [--socket PATH] [--emulator]')
+  console.error('Usage: device.mjs status | try MODULE.mwrm [--seconds 1-3600] [--accept] | remove [MODULE.mwrm] [--accept] | lifecycle | boot BUILD_DIR | key NAME[+NAME] | screen | state | loader | report | probe 0|1 | meter 0|1 | missing | ui | do SEQUENCE | mem ADDR LENGTH | enc A+3 | fader 0-255 [--socket PATH] [--emulator]')
   process.exit(2)
 }
 
@@ -80,18 +84,53 @@ async function keys(spec) {
 async function screen() {
   const frame = (await devIn(7, 0, 1028)).subarray(4)
   const on = (x, y) => (frame[x * 8 + ((63 - y) >> 3)] >> (7 - ((63 - y) & 7))) & 1
-  if (values.png) { // 512x256 greyscale, each pixel 4x4
-    const rows = Buffer.concat(Array.from({ length: 256 }, (_, y) =>
-      Buffer.from([0, ...Array.from({ length: 512 }, (_, x) => on(x >> 2, y >> 2) ? 255 : 24)])))
+  const s = Math.max(1, Math.min(4, Number(values.scale) | 0))
+  if (values.png) { // greyscale, each pixel s x s (4 unless --scale)
+    const rows = Buffer.concat(Array.from({ length: 64 * s }, (_, y) =>
+      Buffer.from([0, ...Array.from({ length: 128 * s }, (_, x) => on(Math.floor(x / s), Math.floor(y / s)) ? 255 : 24)])))
     const chunk = (type, data) => { const t = Buffer.from(type), l = Buffer.alloc(4), c = Buffer.alloc(4)
       l.writeUInt32BE(data.length); c.writeUInt32BE(crc32(Buffer.concat([t, data]))); return Buffer.concat([l, t, data, c]) }
-    const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(512, 0); ihdr.writeUInt32BE(256, 4); ihdr[8] = 8; ihdr[9] = 0
+    const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(128 * s, 0); ihdr.writeUInt32BE(64 * s, 4); ihdr[8] = 8; ihdr[9] = 0
     writeFileSync(values.png, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr),
       chunk('IDAT', deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]))
     return console.log('screen saved to ' + values.png)
   }
   for (let y = 0; y < 64; y += 2)
     console.log(Array.from({ length: 128 }, (_, x) => ' ▄▀█'[on(x, y) * 2 + on(x, y + 1)]).join(''))
+}
+/** RAM, read-only (dev.c MEM): at most 511 bytes, never a whole number of 64-byte packets. */
+async function mem(at, length) {
+  const n = length % 64 ? length : length + 1
+  await devIn(15, at >>> 16, 1)
+  return (await devIn(16, at & 0xffff, n)).subarray(0, length)
+}
+/** What the unit shows, as text: each track's effects (their descriptors' names), the current track, transport. */
+async function ui() {
+  const track = (await mem(0x80000000, 1))[0], live = await mem(0x80000ec4, 16)
+  const tables = await mem(0x400d5f58, 260), view = new DataView(tables.buffer, tables.byteOffset, 260), names = new Map()
+  const name = async descriptor => {
+    if (!names.has(descriptor)) names.set(descriptor, Buffer.from(await mem(descriptor + 9, 13)).toString('latin1').replace(/\0.*$/s, ''))
+    return names.get(descriptor)
+  }
+  const [stopped, recording] = await devIn(6, 0, 2)
+  const lines = []
+  for (let t = 0; t < 8; t++)
+    lines.push(`${t === track ? '>' : ' '}T${t + 1} ${(await name(view.getUint32(4 * live[t]))).padEnd(12)} ${await name(view.getUint32(132 + 4 * live[8 + t]))}`)
+  console.log(lines.join('\n') + `\n${stopped ? 'stopped' : 'playing'}${recording ? ', recording' : ''}`)
+}
+/** One connection for a whole sequence: KEY or KEY+KEY (with *N to repeat), w300 (wait ms), encC+3, fader128, ui, screen, state. */
+async function run(sequence) {
+  for (const step of sequence.trim().split(/\s+/)) {
+    let m
+    if ((m = /^w(\d+)$/.exec(step))) await wait(Number(m[1]))
+    else if ((m = /^enc([A-F]|LEVEL)([+-]\d+)$/i.exec(step))) await devIn(8, 0x30 | ('ABCDEF'.indexOf(m[1].toUpperCase()) >= 0 ? 'ABCDEF'.indexOf(m[1].toUpperCase()) : 6) | (Number(m[2]) & 0xff) << 8, 1)
+    else if ((m = /^fader(\d+)$/.exec(step))) await devIn(8, 0x40 | Number(m[1]) << 8, 1)
+    else if (step === 'ui') await ui()
+    else if (step === 'screen') await screen()
+    else if (step === 'state') { const [s, r] = await devIn(6, 0, 2); console.log(s ? 'stopped' : 'playing', r ? 'recording' : '') }
+    else { const [, spec, times] = /^(.+?)(?:\*(\d+))?$/.exec(step); for (let i = 0; i < Number(times ?? 1); i++) await keys(spec) }
+    await wait(60)
+  }
 }
 const state = s => `${s.phase}, generation ${s.generation}, active ${s.active?.slice(0, 16) ?? 'unknown'}…`
 console.log(`${identity.model}, base ${identity.base.slice(0, 16)}…`)
@@ -141,6 +180,12 @@ async function rebooted() {
 try {
   if (command === 'key') { await keys(file); process.exit(0) }
   if (command === 'screen') { await screen(); process.exit(0) }
+  if (command === 'ui') { await ui(); process.exit(0) }
+  if (command === 'do') { await run(file); process.exit(0) }
+  if (command === 'mem') {
+    const [, length] = process.argv.slice(process.argv.indexOf('mem') + 1)
+    console.log(Buffer.from(await mem(Number(file), Number(length) || 16)).toString('hex').replace(/(.{8})/g, '$1 ').trim()); process.exit(0)
+  }
   if (command === 'enc') {
     const [, name, delta] = /^([A-F]|LEVEL)([+-]\d+)$/i.exec(file) ?? []
     const encoder = 'ABCDEF'.indexOf(name?.toUpperCase()) >= 0 ? 'ABCDEF'.indexOf(name.toUpperCase()) : name?.toUpperCase() === 'LEVEL' ? 6 : -1
