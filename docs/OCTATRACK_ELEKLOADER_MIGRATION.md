@@ -1901,6 +1901,25 @@ cannot carry an endpoint-free vendor interface, a machine may use another
 transport (for example SysEx over USB MIDI, which the Digitakt and Digitone
 stock OS already accept for updates) carrying the same frames.
 
+### What the site's Your Octatrack page needs from the base (owner, 11 October 2026)
+
+The site now calls configurations **module sets** and has a **Your Octatrack** page
+([`YourOctatrack`](../src/components/YourOctatrack.tsx)) that shows what is on the unit and
+changes it. The owner decided that loading a module set makes the unit match it exactly, and
+that a module set also says which stock effects stay in the FX menus. The page runs on the dev
+preview's pretend unit until the base provides:
+
+1. **An inventory request**: the kept set's modules (module id from each ABI 4 package, version
+   if known) and the stock effects left out of the menus. Site seam:
+   `readInventory: () => Promise<{ moduleIds: string[]; removedStockFx: string[] }>`, with stock
+   effects named by their chooser-metadata keys (FILTER … DARK REV).
+2. **Replace semantics**: a load replaces the kept set, so modules missing from it are removed.
+3. **Stock effects out of the menus**: the chosen stock effects leave the FX1/FX2 menus, kept
+   with the set.
+
+The builder's `prepareUpdate(target)` receives the whole target (`{ name, moduleIds,
+removedStockFx }`).
+
 ## Agreed implementation sequence
 
 1. Qualify the Elekloader base and stopped upload mode, preserving logger,
