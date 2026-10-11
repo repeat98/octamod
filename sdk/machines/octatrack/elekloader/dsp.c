@@ -64,6 +64,7 @@ uint32_t modwerk_fxmap_generation(void);
 void modwerk_fxmap_assign(unsigned id, uint32_t module, unsigned layout, const char *name);
 void modwerk_fxmap_name(unsigned id, char *out);
 extern volatile uint32_t modwerk_fxmap_read, modwerk_fxmap_written;
+extern volatile uint32_t modwerk_modset_generation, modwerk_modset_count, modwerk_modset_result; /* modset.c */
 int modwerk_fxpage_build(unsigned id, uint8_t *recipe, uint32_t bytes, unsigned slots); /* fxpage.c */
 void modwerk_fxpage_drop(unsigned id);
 static uint32_t owner[32];
@@ -470,7 +471,7 @@ uint32_t dl_manager_state(void);
 unsigned modwerk_dsp_report(uint32_t *out)
 {
     const uint32_t words[DSP_REPORT_WORDS] = {
-        9, dl_frames, dl_phase, (uint32_t)dl_job_status(0), (uint32_t)dl_job_status(1), modwerk_dsp_last_flags,
+        10, dl_frames, dl_phase, (uint32_t)dl_job_status(0), (uint32_t)dl_job_status(1), modwerk_dsp_last_flags,
         dl_accepted[0], dl_accepted[1], dl_rejected[0], dl_rejected[1], dl_errors, modwerk_dsp_stalls, modwerk_dsp_drained,
         dl_residency_enabled, dl_manager_state(), modwerk_dsp_watch_ticks, modwerk_dsp_probes, modwerk_dsp_probes_ok,
         modwerk_dsp_probes_failed,
@@ -487,7 +488,8 @@ unsigned modwerk_dsp_report(uint32_t *out)
         (uint32_t)modwerk_dsp_miss_core, modwerk_dsp_miss_bits, modwerk_dsp_miss[0], modwerk_dsp_miss[2], modwerk_dsp_miss[3],
         modwerk_dsp_miss[4], dl_pin7, dl_straddle, dl_c1_sent,
         (uint32_t)modwerk_dsp_meter_core, modwerk_dsp_meter_bits, modwerk_dsp_meter[0], modwerk_dsp_meter[1], modwerk_dsp_meter[2],
-        modwerk_dsp_meter[3], modwerk_dsp_meter[4], modwerk_fxmap_generation(), modwerk_fxmap_read, modwerk_fxmap_written};
+        modwerk_dsp_meter[3], modwerk_dsp_meter[4], modwerk_fxmap_generation(), modwerk_fxmap_read, modwerk_fxmap_written,
+        modwerk_modset_generation, modwerk_modset_count, modwerk_modset_result};
     for (unsigned i = 0; i < DSP_REPORT_WORDS; ++i) out[i] = words[i];
     return DSP_REPORT_WORDS;
 }

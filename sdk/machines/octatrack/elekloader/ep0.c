@@ -261,8 +261,10 @@ void modwerk_ep0_tick(void)
 
 /* Engine task, on every return to its receive. Cheap unless woken. */
 void modwerk_engine_idle(void);
+void modwerk_modset_service(void); /* modset.c: the module set restored after boot, saved after a change */
 void modwerk_engine_idle(void)
 {
+    modwerk_modset_service();
     if (!wake_posted) return;
     wake_posted = 0;
     if (!controller_started) {

@@ -485,7 +485,7 @@ def main():
     # The base owns the USB configuration and the EP0 unknown-request tail.
     spec = importlib.util.spec_from_file_location('modwerk_usb_base', HERE/'usb_base.py')
     usb = importlib.util.module_from_spec(spec); spec.loader.exec_module(usb)
-    for name in ('ep0.c', 'runtime.c', 'runtime.h', 'boot.c', 'boot.h', 'boot.s') + (('dev.c',) if args.dev else ()):
+    for name in ('ep0.c', 'runtime.c', 'runtime.h', 'boot.c', 'boot.h', 'boot.s', 'modset.c') + (('dev.c',) if args.dev else ()):
         shutil.copyfile(HERE / name, source / name)
     dsp_sites, dsp_layout, rows = [], None, None
     if args.dsp_loader:

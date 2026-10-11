@@ -16,7 +16,7 @@
 //   npm run device -- mem 0x80000ec4 16             # RAM, read-only (development bases)
 //   npm run device -- state                         # stopped / playing, recording
 //   npm run device -- loader                        # the DSP loader's counters (--dsp-loader bases)
-//   npm run device -- report                        # its full report (dsp.c modwerk_dsp_report, version 9: 63 words; miss0-2 the first refused packet (dsp_receiver.asm))
+//   npm run device -- report                        # its full report (dsp.c modwerk_dsp_report, version 10: 66 words; miss0-2 the first refused packet (dsp_receiver.asm))
 //   npm run device -- probe 0|1                     # one no-op loader packet to a DSP core
 //   npm run device -- meter 0|1                     # the DSP load meter's last 1024-frame window (core 0's idle iterations)
 //   npm run device -- missing                       # the modules the project names that are not installed (MISSING request)
@@ -211,7 +211,7 @@ try {
       'words0', 'words1', 'earlyVisits', 'parked', 'reinit', 'missing', 'used', 'dry',
       'frameState', 'frameBusy', 'intcIprl', 'intcImrl', 'eportPinFlagSelect', 'edmaIntErr', 'csr0csr1', 'edmaEs',
       'edmaErrors', 'edmaEsSeen', 'missCore', 'missBits', 'missCheck', 'miss0', 'miss1', 'miss2', 'pin7', 'straddles', 'core1Sent',
-      'meterCore', 'meterBits', 'meterSerial', 'idleLeast', 'idleMost', 'idleSum', 'missed', 'mapGeneration', 'mapRead', 'mapWritten']
+      'meterCore', 'meterBits', 'meterSerial', 'idleLeast', 'idleMost', 'idleSum', 'missed', 'mapGeneration', 'mapRead', 'mapWritten', 'setGeneration', 'setModules', 'setResult']
     const bytes = await devIn(11, 0, 4 * names.length), view = new DataView(bytes.buffer, bytes.byteOffset, 4 * names.length)
     const hex = new Set(['hostFlags', 'manager', 'used', 'dry', 'intcIprl', 'intcImrl', 'eportPinFlagSelect', 'edmaIntErr', 'csr0csr1', 'edmaEs', 'edmaEsSeen', 'missCheck', 'miss0', 'miss1', 'miss2'])
     console.log(Object.fromEntries(names.map((name, i) => [name, ['job0', 'job1', 'missCore', 'meterCore'].includes(name) ? view.getInt32(4 * i)
@@ -228,11 +228,11 @@ try {
       module: view.getUint32(8 + 24 * i).toString(16).padStart(8, '0'), name: text(12 + 24 * i, 16) })) : 'nothing missing')
     process.exit(0)
   }
-  if (command === 'meter') { // dsp_receiver.asm's load meter, read back a bit a frame (63 report words, version 9)
+  if (command === 'meter') { // dsp_receiver.asm's load meter, read back a bit a frame (66 report words, version 10)
     if (!['0', '1'].includes(file)) throw new Error('Use meter 0 or meter 1.')
     if (!(await devIn(13, Number(file), 1))[0]) throw new Error('A meter read is already waiting.')
     for (const until = Date.now() + 15000; Date.now() < until; await new Promise(r => setTimeout(r, 200))) {
-      const bytes = await devIn(11, 0, 4 * 63), view = new DataView(bytes.buffer, bytes.byteOffset, 4 * 63), w = i => view.getUint32(4 * i)
+      const bytes = await devIn(11, 0, 4 * 66), view = new DataView(bytes.buffer, bytes.byteOffset, 4 * 66), w = i => view.getUint32(4 * i)
       if (view.getInt32(4 * 53) !== Number(file) || w(54) !== 120) continue
       console.log({ core: Number(file), window: w(55), idleLeast: w(56), idleMost: w(57), idleMean: +(w(58) / 1024).toFixed(1), missed: w(59) })
       process.exit(0)

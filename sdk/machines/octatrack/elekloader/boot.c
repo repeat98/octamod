@@ -72,16 +72,23 @@ static struct modwerk_boot_stage *stage(void) { return uncached(&modwerk_boot_st
 uint8_t *modwerk_boot_staging(void) { return stage()->image; }
 static uint32_t be32(const uint8_t *p) { return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]; }
 
+void modwerk_modset_candidate(const uint8_t *package, uint32_t bytes); /* modset.c: kept across power cycles */
+void modwerk_modset_accepted(void);
 static int prepare(void *u, const uint8_t *d, uint32_t n)
 {
     candidate = 0;
-    if (n < 4u || be32(d) != OS_FIRST) return modwerk_runtime_backend.prepare(u, d, n);
+    modwerk_modset_candidate(0, 0);
+    if (n < 4u || be32(d) != OS_FIRST) {
+        int ok = modwerk_runtime_backend.prepare(u, d, n);
+        if (ok) modwerk_modset_candidate(d, n);
+        return ok;
+    }
     if (d != stage()->image || n < OS_VEROFF + 2u || n > BOOT_IMAGE_BYTES ||
         ((uint32_t)d[OS_VEROFF] << 8 | d[OS_VEROFF + 1u]) != nor_version()) return 0;
     length = n; candidate = 1;
     return 1;
 }
-static int discard(void *u) { candidate = 0; return modwerk_runtime_backend.discard(u); }
+static int discard(void *u) { candidate = 0; modwerk_modset_candidate(0, 0); return modwerk_runtime_backend.discard(u); }
 static enum mu_publication publish(void *u)
 {
     if (!candidate) return modwerk_runtime_backend.publish(u);
@@ -98,12 +105,19 @@ static enum mu_publication publish(void *u)
 /* Rollback before the reset fires (the host or a disconnect): disarm. */
 static int restore(void *u)
 {
+    modwerk_modset_candidate(0, 0); /* rolled back: the set stays as it was */
     if (!armed) return modwerk_runtime_backend.restore(u);
     stage()->mailbox[0] = 0;
     armed = 0; countdown = 0; due = 0;
     return 1;
 }
-static int retire(void *u) { return armed ? 1 : modwerk_runtime_backend.retire(u); }
+static int retire(void *u)
+{
+    if (armed) return 1;
+    int ok = modwerk_runtime_backend.retire(u);
+    if (ok == 1) modwerk_modset_accepted(); /* accepted: it stays after a power cycle */
+    return ok;
+}
 /* Updates stop playback themselves (owner, 10 October 2026; the site asks
  * first): STOP as if pressed, then the runtime's own check, which still
  * refuses until the unit has stopped; the host retries. Never a recording,

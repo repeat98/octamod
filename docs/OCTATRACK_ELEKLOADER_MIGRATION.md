@@ -1438,9 +1438,28 @@ code, and the union keeps more code live; and in `ot_emu` an install right
 after another timed out at ENTER unless a bench command came between (on
 `dsp2-AB3` too; not understood). No hardware run yet.
 
-### Keeping the module set across power cycles: a plan (not built)
+### Keeping the module set across power cycles (built, 11 October 2026)
 
-The owner has not decided whether to do this. If yes:
+The owner decided yes. `modset.c` keeps the accepted set in RAM, each package
+exactly as the host staged it (`boot.c` hands it over at prepare and at
+ACCEPT; a removal drops the module). The engine task writes it, behind the
+logger's gate and with the logger's stock file calls, to `/MODWERK0.SET` and
+`/MODWERK1.SET` in turn ("MWST", version, generation, count, length, the
+base's configuration hash, a SHA-256 over the packages), reading each write
+back whole; a failed save is retried ten seconds later. Three seconds after a
+boot, once the gate is open, the newest whole set this base wrote is installed
+through the runtime loader as a USB install would be. Holding FUNC skips it;
+another base's set or a damaged file installs nothing, and a damaged newer
+file falls back to the older one. Host test `test_modset.c` (pretend card).
+
+On the unit (`dsp3-R3`, base `bda75ad3…`): no set at the first boot; installing
+E-Verb saved generation 1 with one module; a RAM boot of the same base (RAM
+gone, card kept) restored it, E-Verb loaded on both cores where Dev12 names it,
+and MISSING reported nothing. Not yet: a real power cycle into a flashed base
+that has this (the flashed `usbtest9` predates it), the FUNC skip on the unit,
+and what the site offers when the base changed (the set is then refused).
+
+The plan it follows:
 
 - **What is kept.** The accepted set, the packages exactly as the host staged
   them, back to back behind a header: format version, the base's

@@ -20,6 +20,8 @@ static uint32_t image(uint32_t n, uint32_t version)
     return n;
 }
 
+void modwerk_modset_candidate(const uint8_t *package, uint32_t bytes) { (void)package; (void)bytes; }
+void modwerk_modset_accepted(void) {}
 int main(void)
 {
     uint8_t *stage_image = modwerk_boot_staging();

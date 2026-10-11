@@ -224,6 +224,9 @@ class RuntimeSlotTests(unittest.TestCase):
     def test_fx_pages_on_the_host(self):
         self.host_test('test_fxpage.c')
 
+    def test_module_set_on_the_host(self):
+        self.host_test('test_modset.c')
+
 
 
 class DspLoaderTests(unittest.TestCase):
