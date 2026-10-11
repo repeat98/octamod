@@ -21,7 +21,7 @@ function card(module = usb, selected = false) {
 describe('USB Audio setup before adding', () => {
   it('offers configuration instead of quick-add from the library and comparison', () => {
     expect(card()).toContain('aria-label="Configure USB Audio"')
-    expect(card()).not.toContain('aria-label="Add USB Audio to configuration"')
+    expect(card()).not.toContain('aria-label="Add USB Audio to module set"')
     const comparison = render(createElement(ModuleComparison, { ids: [USB_AUDIO_MODULE], selected: [], digiSelected: { digitakt: [], digitone: [] }, onToggle: noop, onToggleDigi: noop, onClose: noop }))
     expect(comparison).toContain('>Configure USB Audio</button>')
     expect(comparison).not.toContain('>Add USB Audio</button>')
@@ -30,20 +30,20 @@ describe('USB Audio setup before adding', () => {
     const html = render(createElement(ModuleDetail, { module: usb, selected: false, onToggle: noop, onConfigureUsbAudio: noop }))
     const [hero, setup] = html.split('id="usb-setup"')
     expect(hero).toContain('Configure USB Audio</button>')
-    expect(hero).not.toContain('Add to configuration</button>')
-    expect(setup).toContain('Add to configuration</button>')
+    expect(hero).not.toContain('Add to module set</button>')
+    expect(setup).toContain('Add to module set</button>')
   })
   it('retains removal for selected USB and quick-add for other modules', () => {
-    expect(card(usb, true)).toContain('aria-label="Remove USB Audio from configuration"')
+    expect(card(usb, true)).toContain('aria-label="Remove USB Audio from module set"')
     const other = MODULES.find(module => module.id === 'miniverb')!
-    expect(card(other)).toContain('aria-label="Add Mini Verb to configuration"')
+    expect(card(other)).toContain('aria-label="Add Mini Verb to module set"')
   })
   it('shows the saved state only after settings have been added', () => {
     const configuration = { ...usbAudioPreset('outbox'), outboxPairs: [1, 3, 5, 7] }
     const html = render(createElement(UsbAudioConfigurator, { draft: configuration, configuration, selected: true, onConfigure: noop, onDraftChange: noop }))
     expect(html).toContain('disabled=""')
     expect(html).toContain('Setup saved</button>')
-    expect(html).not.toContain('Add to configuration</button>')
+    expect(html).not.toContain('Add to module set</button>')
   })
   it('does not offer the legacy stack as an Outbox setup', () => {
     const html = render(createElement(UsbAudioConfigurator, { draft: usbAudioPreset('outbox'), selected: false, onConfigure: noop, onDraftChange: noop }))

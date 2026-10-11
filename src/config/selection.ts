@@ -1,14 +1,15 @@
+import { normalizeRemovedStockFx } from '../catalog/stock-effects'
 import { DSP_LOADER } from '../engine/protocol'
 import { CATALOG_SOURCE, resolveSelection } from '../catalog/modules'
 import { BASE_FIRMWARE, type FirmwareInspection } from '../engine/base'
 import { cleanName, pinModuleVersions, normalizeModuleVersions } from './workspace'
 import { parseUsbAudioConfiguration, USB_AUDIO_MODULE, type UsbAudioConfiguration } from './usb-audio'
 
-export function createSelection(ids: readonly string[], firmware: FirmwareInspection | null, keepStockFx2 = DSP_LOADER, moduleVersions = pinModuleVersions(ids), usbAudio?: UsbAudioConfiguration) {
+export function createSelection(ids: readonly string[], firmware: FirmwareInspection | null, keepStockFx2 = DSP_LOADER, moduleVersions = pinModuleVersions(ids), usbAudio?: UsbAudioConfiguration, removedStockFx?: string[]) {
   if (usbAudio && !ids.includes(USB_AUDIO_MODULE)) throw new Error('USB Audio settings require the USB Audio module.')
   return {
     schemaVersion: usbAudio ? 4 : 3,
-    options: { keepStockFx2, ...(usbAudio ? { usbAudio: parseUsbAudioConfiguration(usbAudio) } : {}) },
+    options: { keepStockFx2, ...(usbAudio ? { usbAudio: parseUsbAudioConfiguration(usbAudio) } : {}), ...(removedStockFx?.length ? { removedStockFx } : {}) },
     app: 'octamod',
     catalog: CATALOG_SOURCE,
     base: firmware
@@ -19,8 +20,8 @@ export function createSelection(ids: readonly string[], firmware: FirmwareInspec
   }
 }
 
-export function downloadSelection(ids: readonly string[], firmware: FirmwareInspection | null, name = "Octamod configuration", keepStockFx2 = DSP_LOADER, moduleVersions = pinModuleVersions(ids), usbAudio?: UsbAudioConfiguration) {
-  const blob = new Blob([JSON.stringify({ ...createSelection(ids, firmware, keepStockFx2, moduleVersions, usbAudio), name }, null, 2) + '\n'], { type: 'application/json' })
+export function downloadSelection(ids: readonly string[], firmware: FirmwareInspection | null, name = "Octamod configuration", keepStockFx2 = DSP_LOADER, moduleVersions = pinModuleVersions(ids), usbAudio?: UsbAudioConfiguration, removedStockFx?: string[]) {
+  const blob = new Blob([JSON.stringify({ ...createSelection(ids, firmware, keepStockFx2, moduleVersions, usbAudio, removedStockFx), name }, null, 2) + '\n'], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -47,5 +48,6 @@ export function parseSelection(text: string) {
   const pins = Number(item.schemaVersion)>=3 ? Object.fromEntries(item.modules.map(module=>{if(typeof module.version!=='string')throw new Error('This backup is missing module versions.');return [module.id,module.version]})) : undefined
   if (item.options?.usbAudio !== undefined && (item.schemaVersion !== 4 || !ids.includes(USB_AUDIO_MODULE))) throw new Error('USB Audio settings require a version 4 backup with USB Audio selected.')
   const usbAudio = item.options?.usbAudio === undefined ? undefined : parseUsbAudioConfiguration(item.options.usbAudio)
-  return { moduleVersions: normalizeModuleVersions(ids,pins), name: cleanName(item.name), moduleIds: ids, keepStockFx2, ...(usbAudio ? { usbAudio } : {}) }
+  const removedStockFx = normalizeRemovedStockFx((item.options as { removedStockFx?: unknown } | undefined)?.removedStockFx)
+  return { moduleVersions: normalizeModuleVersions(ids,pins), name: cleanName(item.name), moduleIds: ids, keepStockFx2, ...(usbAudio ? { usbAudio } : {}), ...(removedStockFx ? { removedStockFx } : {}) }
 }

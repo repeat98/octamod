@@ -34,14 +34,14 @@ export function ConfigurationHeader({ kicker, meta, emptyTitle, configuration, c
   return <header className="page-heading configuration-heading">
     <div>
       <p className="page-kicker">{kicker}</p>
-      <h1>{configuration ? <select className="configuration-switcher" aria-label="Choose configuration" value={configuration.id} onChange={event => onSelect(event.target.value)}>{configurations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select> : emptyTitle}</h1>
+      <h1>{configuration ? <select className="configuration-switcher" aria-label="Choose module set" value={configuration.id} onChange={event => onSelect(event.target.value)}>{configurations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select> : emptyTitle}</h1>
       <p>{meta}</p>
     </div>
     <div className="configuration-heading-actions">
       <button className="button button-primary" onClick={() => onDialog('create')}><Icon name="plus" size={16} />New</button>
       {configuration && <div className="configuration-menu">
-        <button ref={buttonRef} className="button button-quiet" aria-label="Configuration actions" title="Configuration actions" aria-expanded={open} aria-controls={open ? panelId : undefined} onClick={() => setOpen(value => !value)}><Icon name="more" size={18} /></button>
-        {open && <div ref={panelRef} id={panelId} className="configuration-menu-panel" role="group" aria-label="Configuration actions" onKeyDown={moveFocus}>
+        <button ref={buttonRef} className="button button-quiet" aria-label="Module set actions" title="Module set actions" aria-expanded={open} aria-controls={open ? panelId : undefined} onClick={() => setOpen(value => !value)}><Icon name="more" size={18} /></button>
+        {open && <div ref={panelRef} id={panelId} className="configuration-menu-panel" role="group" aria-label="Module set actions" onKeyDown={moveFocus}>
           <button onClick={() => choose(() => onDialog('rename'))}>Rename</button>
           <button onClick={() => choose(() => onDialog('duplicate'))}>Duplicate</button>
           <button onClick={() => choose(onImport)}>Import JSON</button>

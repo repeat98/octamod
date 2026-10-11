@@ -42,7 +42,7 @@ export function AddButton({ name, selected, onToggle, configure = false, conflic
     const label = name + ': ' + conflict.block.reason + '. ' + (swappable ? 'Choose to swap or add anyway.' : 'Choose how to add it.')
     return <button ref={ref} className="add-button is-conflict" aria-label={label} title={conflict.block.reason} aria-expanded={conflict.open} aria-controls={conflict.controls} onClick={conflict.onAsk}><Icon name="swap" size={15} /><span>{swappable ? 'Swap' : 'Review'}</span></button>
   }
-  const label = configure && !selected ? 'Configure ' + name : (selected ? 'Remove ' : 'Add ') + name + (selected ? ' from configuration' : ' to configuration')
+  const label = configure && !selected ? 'Configure ' + name : (selected ? 'Remove ' : 'Add ') + name + (selected ? ' from module set' : ' to module set')
   return <button ref={ref} className={'add-button ' + (selected ? 'is-added' : '')} aria-label={label} title={label} aria-pressed={selected} onClick={onToggle}><Icon name={selected ? 'check' : configure ? 'sliders' : 'plus'} size={15} /><span>{selected ? 'Added' : configure ? 'Configure' : 'Add'}</span></button>
 }
 

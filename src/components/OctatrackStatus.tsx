@@ -8,8 +8,8 @@ const ACTIVE: LinkState['status'][] = ['sending', 'testing', 'trial', 'finishing
 const activity = ({ status, progress = 0 }: LinkState) => status === 'sending' ? `Loading ${Math.round(progress * 100)}%`
   : status === 'testing' ? 'Stress-testing' : status === 'trial' ? 'Waiting for Keep or Undo' : 'Finishing'
 
-/** The Octatrack's connection in the sidebar (`sidebar`) or the status bar (`bar`). Nothing without WebUSB. */
-export function OctatrackStatus({ link, variant, onInstall }: { link: OctatrackLink; variant: 'sidebar' | 'bar'; onInstall: () => void }) {
+/** The Octatrack's connection in the sidebar (`sidebar`, leading to Your Octatrack) or the status bar (`bar`). Nothing without WebUSB. */
+export function OctatrackStatus({ link, variant }: { link: OctatrackLink; variant: 'sidebar' | 'bar' }) {
   const state = useOctatrackLink(link), { status, identity } = state
   if (status === 'unsupported') return null
   const base = !!identity?.canSubmit, busy = ACTIVE.includes(status)
@@ -18,11 +18,7 @@ export function OctatrackStatus({ link, variant, onInstall }: { link: OctatrackL
   const detail = busy ? activity(state) : status === 'idle' ? 'Updates, tests and reports over USB' : status === 'busy' ? 'Another tab or app has it'
     : base ? 'Modwerk base ' + identity!.base.slice(0, 8) : status === 'connecting' ? 'Over USB' : 'Original OS · install the base'
   if (variant === 'bar') return status === 'idle' || status === 'connecting' ? null : <span className="octatrack-status-bar">{dot}{title}{busy && ' · ' + activity(state)}</span>
-  const body = <>{dot}<span className="sidebar-build-copy"><strong>{title}</strong><small>{detail}</small></span><Icon name="arrow" size={14} /></>
-  return status === 'idle' ? <button type="button" className="sidebar-build octatrack-status" onClick={() => void link.connect()}>{body}</button>
-    : status === 'busy' ? <button type="button" className="sidebar-build octatrack-status" onClick={() => void link.retry()}>{body}</button>
-    : base || status === 'connecting' ? <a className="sidebar-build octatrack-status" href="#configuration">{body}</a>
-    : <button type="button" className="sidebar-build octatrack-status" onClick={onInstall}>{body}</button>
+  return <a className="sidebar-build octatrack-status" href="#your-octatrack">{dot}<span className="sidebar-build-copy"><strong>{title}</strong><small>{detail}</small></span><Icon name="arrow" size={14} /></a>
 }
 
 /** A pill while an update runs or waits for Keep or Undo, and for its result, on every page but the configuration page. */

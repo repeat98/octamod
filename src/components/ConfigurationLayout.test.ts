@@ -11,9 +11,9 @@ describe('configuration page layout', () => {
   it('makes the name the switcher and keeps the other actions behind one menu button', () => {
     const first = newConfiguration('Live set'), second = newConfiguration('Studio')
     const html = renderToStaticMarkup(createElement(ConfigurationHeader, { ...header, configuration: second, configurations: [first, second] }))
-    expect(html).toMatch(/<h1><select class="configuration-switcher" aria-label="Choose configuration">/)
+    expect(html).toMatch(/<h1><select class="configuration-switcher" aria-label="Choose module set">/)
     expect(html).toContain('<option value="' + second.id + '" selected="">Studio</option>')
-    expect(html).toContain('aria-label="Configuration actions"')
+    expect(html).toContain('aria-label="Module set actions"')
     expect(html).not.toContain('Delete')
   })
 
@@ -21,7 +21,7 @@ describe('configuration page layout', () => {
     const html = renderToStaticMarkup(createElement(ConfigurationHeader, { ...header, emptyTitle: 'No Digitakt configuration yet' }))
     expect(html).toContain('<h1>No Digitakt configuration yet</h1>')
     expect(html).toContain('New')
-    expect(html).not.toContain('Configuration actions')
+    expect(html).not.toContain('Module set actions')
   })
 
   it('keeps the full flashing and sharing notices beside the acknowledgement', () => {

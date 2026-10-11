@@ -58,7 +58,7 @@ describe('configuration stock FX summary', () => {
 
   it('does not promise a replacement plan for a blocked configuration', () => {
     const html = render(['analog-bassdrum', 'tapeecho'], { key: 'selection', state: 'error', error: 'Incompatible modules' })
-    expect(html).toContain('Resolve the configuration issues to see')
+    expect(html).toContain('Resolve the module set issues to see')
     expect(html).not.toContain('<li>')
     expect(html).not.toContain('Selection preview')
     expect(html).not.toContain('No stock FX will be replaced.')

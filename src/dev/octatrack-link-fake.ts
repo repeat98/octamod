@@ -2,6 +2,7 @@
 // A pretend Octatrack for the link's tests and the dev previews
 // (`?preview=usb-link`, `?preview=base-install`): enumerates like the base, answers IDENTIFY with
 // real bytes, and runs the upload session's phases with no device behind them.
+import type { Inventory, InventoryTarget } from '../config/inventory.ts'
 import { OctatrackLink, type LinkDevice, type LinkSession, type LinkUsb } from '../engine/elekloader/octatrack-link.ts'
 import { UploadDeviceError } from '../engine/elekloader/upload-session.ts'
 import { VENDOR_CLASS, VENDOR_PROTOCOL, VENDOR_SUBCLASS } from '../engine/elekloader/upload-usb.ts'
@@ -23,6 +24,9 @@ export interface FakeUnit {
   playing: boolean
   /** The kept set's digest; the base's own while nothing is loaded. */
   active: string
+  /** What the unit has, and what a staged load would make it (taken on Keep). */
+  installed: Inventory
+  pending?: Inventory
 }
 
 export function fakeUnit(kind: 'base' | 'stock' | 'none' = 'base'): FakeUnit {
@@ -47,7 +51,7 @@ export function fakeUnit(kind: 'base' | 'stock' | 'none' = 'base'): FakeUnit {
   }
   let device: LinkDevice | undefined = kind === 'none' ? undefined : make(kind === 'base')
   const unit: FakeUnit = {
-    taken: false, playing: false, active: FAKE_BASE,
+    taken: false, playing: false, installed: { moduleIds: [], removedStockFx: [] }, active: FAKE_BASE,
     usb: {
       async requestDevice() { if (!device) throw new DOMException('No device selected.', 'NotFoundError'); return device },
       async getDevices() { return device ? [device] : [] },
@@ -89,8 +93,8 @@ export function fakeSession(unit: FakeUnit, delay = 0) {
       activate: () => step('pending'),
       startTrial: async () => status = { ...await step('trial'), active: staged },
       holdTrial: () => step('pending', unit.playing ? 'unsafe' : undefined),
-      accept: async () => { await step('ready'); unit.active = status.active!; return status },
-      rollback: async () => status = { ...await step('ready'), active: unit.active },
+      accept: async () => { await step('ready'); unit.active = status.active!; unit.installed = unit.pending ?? unit.installed; unit.pending = undefined; return status },
+      rollback: async () => { unit.pending = undefined; return status = { ...await step('ready'), active: unit.active } },
       cancel: () => step('normal'),
       leaveUploadMode: () => step('normal'),
     }
@@ -105,17 +109,20 @@ export function fakeSession(unit: FakeUnit, delay = 0) {
  */
 export function previewKit() {
   const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+  const kind = new URLSearchParams(window.location.search).get('unit')
+  if (kind === 'unsupported') return { link: new OctatrackLink(null) }
+  const unit = fakeUnit(kind === 'stock' || kind === 'none' ? kind : 'base')
+  unit.installed = { moduleIds: ['everb', 'airwindows-chorus', 'poly8'], removedStockFx: ['DARK REV'] }
+  Object.assign(window, { modwerkUsbPreview: unit })
   return {
-    link: previewLink(),
-    // A pretend update and stress test, so the whole flow can be clicked through.
-    prepareUpdate: async () => { await wait(400); return { name: 'My first configuration', data: new Uint8Array(160 * 1024) } },
+    link: new OctatrackLink(unit.usb, fakeSession(unit, 60)),
+    // A pretend load, stress test and inventory, so the whole flow can be clicked through.
+    prepareUpdate: async (target: InventoryTarget) => {
+      await wait(400); unit.pending = { moduleIds: target.moduleIds, removedStockFx: target.removedStockFx ?? [] }
+      // Each load stages different bytes, so the unit's active digest (and the inventory read after Keep) changes.
+      return { name: target.name, data: new TextEncoder().encode(JSON.stringify(unit.pending).padEnd(160 * 1024)) }
+    },
+    readInventory: async () => { await wait(150); return structuredClone(unit.installed) },
     stressTest: async () => { await wait(2500); return null },
   }
-}
-function previewLink() {
-  const kind = new URLSearchParams(window.location.search).get('unit')
-  if (kind === 'unsupported') return new OctatrackLink(null)
-  const unit = fakeUnit(kind === 'stock' || kind === 'none' ? kind : 'base')
-  Object.assign(window, { modwerkUsbPreview: unit })
-  return new OctatrackLink(unit.usb, fakeSession(unit, 60))
 }

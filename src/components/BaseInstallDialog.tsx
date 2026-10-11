@@ -16,7 +16,7 @@ const ALSO_NEW: [IconName, string, string][] = [
   ['check', 'All modules are cross-compatible', ', no more conflicts between them'],
   ['sliders', 'Stock effects stay', ', none of them get replaced'],
   ['wave', 'Effects load on demand', ', straight onto the DSP chip when you pick them'],
-  ['shield', 'Automatic stress tests', ' for every module and configuration before it lands'],
+  ['shield', 'Automatic stress tests', ' for every module and module set before it lands'],
   ['message', 'Automatic bug reports', ' when something fails, straight to the module’s author'],
 ]
 const SCREEN = ['LOADING', 'TRYING', 'KEPT']
@@ -167,7 +167,7 @@ export function BaseInstallDialog({ link, launch = false, firmwareReady, onChoos
     <p className="link-hint">The original OS goes back on the same way. If the Octatrack doesn’t start, follow <a className="text-button" href="#faq" target="_blank" rel="noreferrer">recovery in the FAQ</a>.</p>
     </>}
     <footer className="base-install-footer">
-      <p className="link-hint">{found ? 'All set.' : 'It’s on the Octatrack configuration page whenever you want it.'}</p>
+      <p className="link-hint">{found ? 'All set.' : 'It’s under Your Octatrack whenever you want it.'}</p>
       <div className="base-install-actions">
         <button type="button" className={'button ' + (found ? 'button-primary' : 'button-quiet')} disabled={!canClose} onClick={finish}>{found ? 'Done' : !launch ? 'Close' : hold ? `Later (${hold})` : 'Later'}</button>
         {view === 'intro' && !found && <button type="button" className="button button-primary" onClick={() => setView('steps')}>Show me how<Icon name="arrow" size={16} /></button>}

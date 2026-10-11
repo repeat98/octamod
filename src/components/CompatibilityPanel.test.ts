@@ -27,7 +27,7 @@ describe('configuration placement status', () => {
   it.each(['mute-modes', 'recorder-loop-fix'])('shows the placement refusal for the reported selection with %s', id => {
     const error = explainBuildFailure('A module menu cave exceeds its reserved region.')
     const html = render('error', error, [...reportedSelection, id])
-    expect(html).toContain('Configuration needs attention')
+    expect(html).toContain('Module set needs attention')
     expect(html).toContain(error)
     expect(html).toContain('menu and patch space')
     expect(html).not.toContain('Choose your base firmware')
@@ -42,14 +42,14 @@ describe('configuration placement status', () => {
 
   it('shows checks in progress after firmware selection', () => {
     const html = render('validating')
-    expect(html).toContain('Checking configuration')
+    expect(html).toContain('Checking module set')
     expect(html).toContain('Checking whether your modules fit in the selected base firmware')
     expect(html).not.toContain('Choose your base firmware')
   })
 
   it('retains the firmware prompt before checks and the checked state afterwards', () => {
     expect(render('empty')).toContain('Choose your base firmware for placement checks.')
-    expect(render('valid')).toContain('Configuration fits')
+    expect(render('valid')).toContain('Module set fits')
     expect(render('valid')).toContain('Selection and placement checks passed locally.')
   })
 

@@ -2,13 +2,7 @@ import metadata from '../engine/assets/chooser-metadata.json'
 import { defaultChoosers } from '../engine/choosers'
 import { DSP_LOADER } from '../engine/protocol'
 import type { BuildView } from '../hooks/useFirmwareBuild'
-
-const FX_NAMES: Record<string, string> = {
-  FILTER: 'Filter', EQUALIZER: 'Equalizer', 'DJ EQ': 'DJ EQ', PHASER: 'Phaser',
-  FLANGER: 'Flanger', CHORUS: 'Chorus', SPATIALIZER: 'Spatializer',
-  'COMB FILTER': 'Comb Filter', COMPRESSOR: 'Compressor', 'LO-FI': 'Lo-Fi',
-  DELAY: 'Delay', 'PLATE REV': 'Plate Reverb', 'SPRING REV': 'Spring Reverb', 'DARK REV': 'Dark Reverb',
-}
+import { STOCK_EFFECT_NAMES as FX_NAMES } from '../catalog/stock-effects'
 
 export function ConfigurationEffects({ ids, keepStockFx2, build }: { ids: readonly string[]; keepStockFx2: boolean; build: BuildView }) {
   const blocked = build.state === 'error'
@@ -20,7 +14,7 @@ export function ConfigurationEffects({ ids, keepStockFx2, build }: { ids: readon
   return <section className="configuration-section stock-fx-summary" aria-labelledby="stock-fx-title">
     <div className="section-title"><h2 id="stock-fx-title">Stock FX replacements</h2>{!blocked && <span className="subtle">{checked ? 'Checked for this build' : 'Selection preview'}</span>}</div>
     <div aria-live="polite">
-      {blocked ? <p>Resolve the configuration issues to see which stock FX will be replaced.</p> : <>
+      {blocked ? <p>Resolve the module set issues to see which stock FX will be replaced.</p> : <>
         {omitted.length ? <>
           <p>These stock effects will be unavailable in FX2:</p>
           <ul className="stock-fx-list">{omitted.map(key => <li key={key}>{FX_NAMES[key] ?? key}</li>)}</ul>

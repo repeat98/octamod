@@ -102,7 +102,7 @@ export function MachineLibrary({ device, query, category, octatrackModules: octa
   ]
   const typeCounts = families.map(value => ({ value, count: scopeFamilies.filter(item => item === value).length })).filter(option => option.count || option.value === libraryFamily)
   const warnings = [
-    ...((!device || device.id === 'octatrack') && octatrackConflicts.length ? [{device: DEVICES_BY_ID.octatrack, description: 'Some modules cannot run together. Choose a compatible set in your configuration.'}] : []),
+    ...((!device || device.id === 'octatrack') && octatrackConflicts.length ? [{device: DEVICES_BY_ID.octatrack, description: 'Some modules cannot run together. Choose a compatible set in your module set.'}] : []),
     ...(['digitakt', 'digitone'] as const).filter(id => !device || device.id === id).flatMap(id => {
       const estimate = estimateCombination(id, digiSelected[id])
       return !estimate.fits || estimate.clashes.length ? [{device: DEVICES_BY_ID[id], description: !estimate.fits ? 'The selected mods need more memory than this machine shares with mods.' : 'The selected mods cannot be used together.'}] : []
@@ -142,7 +142,7 @@ export function MachineLibrary({ device, query, category, octatrackModules: octa
       <p className="popularity-note">{statistics ? downloadCoverage(statistics[0]?.downloadsStarted) : 'Popularity counts are currently unavailable.'}{sort === 'rated' && ' ' + RATING_RANKING_NOTE}{' ' + STABILITY_NOTE}{device && sort === 'recent' && device.id !== 'octatrack' && ' Addition dates are not available yet; this sort uses name order.'}</p>
       {!total && <div className="no-results"><Icon name={term || libraryFamily !== 'all' ? 'search' : category === 'standalone' ? 'lock' : 'grid'} size={30} /><h2>{term || libraryFamily !== 'all' ? 'No modules found' : 'No ' + (category ? LIBRARY_CATEGORY_LABELS[category].toLowerCase() : 'modules') + ' here yet'}</h2><p>{term || libraryFamily !== 'all' ? 'Try another name, type or author.' : 'Be the first to publish one: every machine follows the same SDK.'}</p>{onClearSearch && (term || libraryFamily !== 'all') ? <button className="button button-quiet" onClick={onClearSearch}>Clear search</button> : <a className="button button-quiet" href={term || libraryFamily !== 'all' ? deviceHref(device?.id ?? ALL_MACHINES) : issueRepository() + '/blob/main/docs/SDK.md'}>Browse modules</a>}</div>}
       {children}
-      {device && <div className="library-note"><span className="status-dot" /><p>{device.id === 'octatrack' ? 'This catalog follows an experimental build. Review each module before preparing a configuration.' : 'Built from each author’s pinned public release, with credit and licence.'}</p></div>}
+      {device && <div className="library-note"><span className="status-dot" /><p>{device.id === 'octatrack' ? 'This catalog follows an experimental build. Review each module before preparing a module set.' : 'Built from each author’s pinned public release, with credit and licence.'}</p></div>}
       {!device && <section className="machine-section"><div className="library-subheading"><span>No mods yet</span><span className="subtle">Help open the next machine</span></div><div className="machine-chips">{DEVICES.filter(machine => machine.status === 'research' || machine.status === 'open').map(machine => <a key={machine.id} href={deviceHref(machine.id)} className={'machine-chip is-' + machine.status}>{machine.name}{machine.variants && <small> {machine.variants.join(' · ')}</small>}</a>)}</div></section>}
     </> : device && <EmptyMachine device={device} embedded />}
   </div>
@@ -159,20 +159,20 @@ export function DigiConfiguration({ device, configuration, configurations, onSel
   async function importBackup(file?: File) {
     if (!file) return
     setImportError(''); setImportNotes([])
-    try { if (file.size > 32 * 1024) throw new Error('Configuration backups must be smaller than 32 KB.'); const imported = parseDigiSelection(await file.text(), device.id); onImport(imported); setImportNotes(imported.notes) }
-    catch(error) { setImportError(error instanceof Error ? error.message : 'Unable to import this configuration.') }
+    try { if (file.size > 32 * 1024) throw new Error('Module set backups must be smaller than 32 KB.'); const imported = parseDigiSelection(await file.text(), device.id); onImport(imported); setImportNotes(imported.notes) }
+    catch(error) { setImportError(error instanceof Error ? error.message : 'Unable to import this module set.') }
   }
   return (
     <div className="configuration-page">
-      <ConfigurationHeader kicker={'YOUR WORKSPACE · ' + device.name.toUpperCase()} meta={device.name + ' · OS ' + (device.firmware?.releases.join(' / ') ?? '') + ' · Changes save automatically on this device.'} emptyTitle={'No ' + device.name + ' configuration yet'} configuration={configuration} configurations={configurations} onSelect={onSelect} onDialog={onDialog} onImport={() => importRef.current?.click()} shareHref={'#forum/new?category=configs&machine=' + device.id} canReport={!!ids.length} onReport={onReport}/>
-      <input ref={importRef} type="file" accept="application/json,.json" hidden aria-label="Import configuration backup" onChange={event => { void importBackup(event.target.files?.[0]); event.target.value = '' }}/>
+      <ConfigurationHeader kicker={'YOUR WORKSPACE · ' + device.name.toUpperCase()} meta={device.name + ' · OS ' + (device.firmware?.releases.join(' / ') ?? '') + ' · Changes save automatically on this device.'} emptyTitle={'No ' + device.name + ' module set yet'} configuration={configuration} configurations={configurations} onSelect={onSelect} onDialog={onDialog} onImport={() => importRef.current?.click()} shareHref={'#forum/new?category=configs&machine=' + device.id} canReport={!!ids.length} onReport={onReport}/>
+      <input ref={importRef} type="file" accept="application/json,.json" hidden aria-label="Import module set backup" onChange={event => { void importBackup(event.target.files?.[0]); event.target.value = '' }}/>
       {importError && <p className="file-error" role="alert">{importError}</p>}
       {importNotes.length > 0 && <div className="import-notes" role="status"><strong>Imported from an older catalog</strong>{importNotes.map(note => <p key={note}>{note}</p>)}</div>}
       <div className="configuration-layout">
         <div className="configuration-main">
           <section className="configuration-section" aria-labelledby="digi-selection-title"><div className="section-title"><h2 id="digi-selection-title">Selected modules <span className="subtle">{selection.length}</span></h2><a className="text-button" href={deviceHref(device.id)}>Browse modules <Icon name="plus" size={14} /></a></div>
             {selection.length ? <ul className="selected-list">{selection.map(mod => <li key={mod.id}><a className="selected-module-link" href={deviceHref(device.id, 'module/' + mod.id)}><DigiModPreview mod={mod} compact /><span><strong>{mod.title}</strong><small>{mod.category} · {mod.author} · {kib(mod.ramBytes)}</small></span></a><button className="icon-button" aria-label={'Remove ' + mod.title} onClick={() => onToggle(mod.id)}><Icon name="close" size={17} /></button></li>)}</ul>
-              : <div className="selection-empty"><Icon name="grid" size={26} /><strong>No modules selected</strong><p>Find something in the library and add it to your configuration.</p><a className="button button-quiet" href={deviceHref(device.id)}>Browse modules</a></div>}
+              : <div className="selection-empty"><Icon name="grid" size={26} /><strong>No modules selected</strong><p>Find something in the library and add it to your module set.</p><a className="button button-quiet" href={deviceHref(device.id)}>Browse modules</a></div>}
           </section>
           <section className="configuration-section" aria-labelledby="digi-resources-title"><div className="section-title"><h2 id="digi-resources-title">Resources</h2><span className="subtle">core {DIGI_CORES[device.id].version} · {DIGI_CORES[device.id].slots}</span></div>
             <div className={'resource-meter' + (estimate.fits ? '' : ' is-over')} role="meter" aria-valuemin={0} aria-valuemax={estimate.areaBytes} aria-valuenow={estimate.usedBytes} aria-label="Shared mod memory">

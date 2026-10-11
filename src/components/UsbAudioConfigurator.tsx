@@ -107,9 +107,9 @@ export function UsbAudioConfigurator({ draft, onDraftChange, configuration, sele
     </div> : <div className="usb-setup-computer"><h3>USB inputs in your DAW</h3><p>Choose these stereo input pairs when recording.</p>
       <div className="usb-setup-channels" aria-label="USB input channel map">{layout.pairs.map((pair, index) => <span key={pair}>{pair}<small>USB {index * 2 + 1}/{index * 2 + 2}</small></span>)}</div>
     </div>}
-    <div className="usb-setup-footer"><div className="usb-setup-save-target"><span>{dirty ? 'Unsaved changes for' : saved ? 'Saved to configuration' : 'Configuration'}</span><strong>{configurationName ?? 'Your configuration'}</strong></div>
+    <div className="usb-setup-footer"><div className="usb-setup-save-target"><span>{dirty ? 'Unsaved changes for' : saved ? 'Saved to module set' : 'Module set'}</span><strong>{configurationName ?? 'Your module set'}</strong></div>
       <div className="usb-setup-save-actions">{dirty && <button className="text-button" onClick={() => { if (configuration) updateDraft(configuration); setRoutingNotice('') }}>Discard changes</button>}
-        <button className={'button ' + (saved ? 'button-added' : 'button-primary')} disabled={saved} onClick={() => onConfigure(draft)}><Icon name={saved ? 'check' : selected ? 'sliders' : 'plus'} size={15}/>{saved ? 'Setup saved' : selected ? 'Save setup' : 'Add to configuration'}</button>
+        <button className={'button ' + (saved ? 'button-added' : 'button-primary')} disabled={saved} onClick={() => onConfigure(draft)}><Icon name={saved ? 'check' : selected ? 'sliders' : 'plus'} size={15}/>{saved ? 'Setup saved' : selected ? 'Save setup' : 'Add to module set'}</button>
       </div>
     </div>
     <p className="usb-setup-status">USB 0.2 experimental · Released with owner approval; hardware testing was waived.</p>
