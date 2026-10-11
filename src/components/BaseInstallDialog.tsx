@@ -9,10 +9,12 @@ import './octatrack-link.css'
 export interface BaseImage { buffer: ArrayBuffer; sha256: string }
 /** The release prompt holds this long before it can be put off. */
 const LAUNCH_HOLD_SECONDS = 10
-// What the release prompt promises. Every line must be true on release day: several modules at once, the
-// stress tests and the automatic reports are still to be built (docs/OCTATRACK_ELEKLOADER_MIGRATION.md).
+// What the release prompt promises. Every line must be true on release day: cross-compatibility, stock effects
+// kept, the stress tests and the automatic reports are still to be built (docs/OCTATRACK_ELEKLOADER_MIGRATION.md).
 const ALSO_NEW: [IconName, string, string][] = [
   ['grid', 'As many modules as fit', ', all selectable from the Octatrack’s menus'],
+  ['check', 'All modules are cross-compatible', ', no more conflicts between them'],
+  ['sliders', 'Stock effects stay', ', none of them get replaced'],
   ['wave', 'Effects load on demand', ', straight onto the DSP chip when you pick them'],
   ['shield', 'Automatic stress tests', ' for every module and configuration before it lands'],
   ['message', 'Automatic bug reports', ' when something fails, straight to the module’s author'],

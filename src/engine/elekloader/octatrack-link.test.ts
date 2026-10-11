@@ -55,7 +55,7 @@ describe('sending a module', () => {
     expect(progress.at(-1)).toBe(1)
     await link.keep()
     expect(link.getState()).toMatchObject({ status: 'ready', notice: { tone: 'success' }, active: sha(data) })
-    expect(link.getState().notice!.text).toMatch(/Kept\. PREVIEW VOL stays loaded until you switch the Octatrack off/)
+    expect(link.getState().notice!.text).toMatch(/Kept\. PREVIEW VOL stays on your Octatrack, also after a restart/)
   })
   it('keeps the trial running when playback blocks keep, and finishes once stopped', async () => {
     const { unit, link } = await linked()

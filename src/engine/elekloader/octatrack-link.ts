@@ -220,7 +220,7 @@ export class OctatrackLink {
       if (keep) await session.accept(); else await session.rollback()
       await session.leaveUploadMode()
       await this.release()
-      this.ready({ tone: 'success', text: keep ? `Kept. ${module} stays loaded until you switch the Octatrack off.` : 'Undone. Your Octatrack is back to how it was.' },
+      this.ready({ tone: 'success', text: keep ? `Kept. ${module} stays on your Octatrack, also after a restart.` : 'Undone. Your Octatrack is back to how it was.' },
         session.status.active)
     } catch (error) {
       // Playing blocks the stop that keep and undo need; the trial carries on until the user stops.
