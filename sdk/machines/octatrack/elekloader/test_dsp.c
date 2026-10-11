@@ -140,6 +140,10 @@ int main(void)
     modwerk_test_write = capture;
     modwerk_fxmap_write(7);
     CHECK(!strcmp(written, "#MODWERK_FX=26:00000047:2:Mod G\r\n#MODWERK_FX=27:00000046:1:Mod F\r\n"));
+    /* MISSING: what the project names that no installed module answers for (0x47 at 26 is not installed). */
+    uint8_t list[316];
+    CHECK(modwerk_dsp_missing_list(list) == 28 && !memcmp(list, "MWM\1", 4) && list[4] == 26 && list[7] == 2 &&
+          list[11] == 0x47 && !strcmp((const char *)list + 12, "Mod G"));
     /* A project without lines names today's assignments. */
     modwerk_fxmap_begin(1); modwerk_fxmap_loaded(0);
     CHECK(modwerk_fxmap_handle(0x873d83ccu) == 27 && !modwerk_fxmap_module(26));

@@ -1010,10 +1010,20 @@ card, another unit) and change version, and old projects must keep loading:
     the same project read it back (map generation 2), with E-Verb still bound
     and no errors. After a RAM boot (modules gone, battery RAM kept) the map was
     still there and E-Verb's slots ran dry and were reported.
-  - Not yet: the popup's text on the unit (at boot it fires behind stock's
-    LOADING FILES bar, so it should show again once the unit is idle), a
-    missing-module request over USB for the site, rebinding on the unit, and
-    runtime chooser rows and parameter pages.
+  - Missing modules, reported (`dsp3-M6`, 11 October 2026): the unit says
+    `MISSING E-VERB` when a module goes missing and again whenever a track
+    running it is selected, because at boot the first report lands behind
+    stock's LOADING FILES bar. Stock's popup slot (`0x460d175c`) reads open
+    (`0x21`) long after the bar is gone, so it cannot tell when to say it. The
+    popup sizes its box for capitals only (`MISSING E-Verb` showed as `MISSING
+    E-V`), so the name is upper-cased; it stays about 1.5 s (`0xa0`). The
+    vendor interface answers MISSING (`0xC1`, bRequest 14, wLength 316): "MWM",
+    a count, then per handle its number, layout, module id and name, for
+    every module the project names in any bank that nothing installed answers
+    for. On the unit: `[{handle: 27, layout: 1, module: 873d83cc, name:
+    E-Verb}]` (`npm run device -- missing`).
+  - Not yet: rebinding on the unit, the site using MISSING, and runtime chooser
+    rows and parameter pages.
 - **What a project uses.** `modwerk_dsp_used()` reports the module effects
   the current bank names (what runs, and all four Parts, working and saved)
   as one bit per id, for an update to warn before it removes one. Other

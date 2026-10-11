@@ -211,6 +211,27 @@ uint32_t modwerk_dsp_dry(void)
     }
     return dry;
 }
+/* MISSING (ep0.c): the modules the project names, in any bank, that no installed module answers for:
+ * "MWM" and a count, then per handle 24 bytes: the handle, 0, the layout (big-endian), the module id
+ * (big-endian) and the name (16 bytes). 4 + 24 x count bytes, never a whole number of 64-byte packets. */
+int modwerk_fxmap_describe(unsigned id, uint32_t *module, uint16_t *layout, char *name);
+unsigned modwerk_dsp_missing_list(uint8_t *out)
+{
+    uint32_t used = modwerk_fxmap_used();
+    unsigned n = 0;
+    for (unsigned k = 0; k < 32u; ++k) {
+        uint32_t module;
+        uint16_t layout;
+        char name[16];
+        if (!(used >> k & 1u) || !modwerk_fxmap_describe(k, &module, &layout, name) || owner[k] == module) continue;
+        uint8_t *e = out + 4u + 24u * n++;
+        e[0] = (uint8_t)k, e[1] = 0, e[2] = (uint8_t)(layout >> 8), e[3] = (uint8_t)layout;
+        for (unsigned i = 0; i < 4u; ++i) e[4 + i] = (uint8_t)(module >> (24 - 8 * i));
+        for (unsigned i = 0; i < 16u; ++i) e[8 + i] = (uint8_t)name[i];
+    }
+    out[0] = 'M', out[1] = 'W', out[2] = 'M', out[3] = (uint8_t)n;
+    return 4u + 24u * n;
+}
 /* The host side of each core's HI08 (sdk/octabam/tools/emu/ot_emu/dsp.h): the
  * window at 0x20000000 shows the core the GPIO byte selects, one byte register
  * per 4-byte stride in the low byte of a 16-bit access. */
@@ -386,16 +407,25 @@ void modwerk_dsp_tick(void)
     if ((dl_phase || dl_c1_phase) && EDMA_ES >> 31 && !(EDMA_ES >> 8 & 0xfu)) recover(); /* eDMA refused our transfer: at once */
     else if (modwerk_dsp_stalled(dl_frames, dl_phase || !dl_job_status(0) || !dl_job_status(1))) recover();
     rebind_tick();
-    uint32_t dry = rebinding ? missing_shown : modwerk_dsp_dry(), fresh = dry & ~missing_shown;
-    if (fresh) { /* the project's map names what is missing */
+    uint32_t dry = rebinding ? missing_shown : modwerk_dsp_dry(), say = dry & ~missing_shown;
+    missing_shown = dry;
+    /* Said when it goes missing, and again whenever a track running it is selected: at boot the
+     * first can land behind stock's LOADING FILES bar (stock's popup slot stays "open" after it). */
+    static unsigned last_track = 0xffu;
+    unsigned track = *(volatile uint8_t *)0x80000000u; /* the current track; 8 and up on the MIDI side */
+    if (track != last_track) {
+        last_track = track;
+        if (track < 8u) say |= dry & (1u << (LIVE_FX[track] & 31u) | 1u << (LIVE_FX[8u + track] & 31u));
+    }
+    if (say) { /* the project's map names what is missing */
         static char text[24] = "MISSING ";
         unsigned k = 0;
-        while (!(fresh >> k & 1u)) ++k;
+        while (!(say >> k & 1u)) ++k;
         modwerk_fxmap_name(k, text + 8);
-        ((void (*)(const char *, unsigned))0x4005a2b8u)(text[8] ? text : "MODULE MISSING", 0x30);
+        for (char *c = text + 8; *c; ++c) if (*c >= 'a' && *c <= 'z') *c = (char)(*c - 32); /* the popup sizes capitals only */
+        ((void (*)(const char *, unsigned))0x4005a2b8u)(text[8] ? text : "MODULE MISSING", 0xa0);
         modwerk_dsp_missing = modwerk_dsp_missing + 1;
     }
-    missing_shown = dry;
     if (nudge) { nudge = 0; dl_residency_nudge(); }
     if (picks_in == picks_out) return;
     uint32_t p = picks[picks_out % 4u];

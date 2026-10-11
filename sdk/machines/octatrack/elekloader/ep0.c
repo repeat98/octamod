@@ -55,7 +55,7 @@ extern const uint8_t modwerk_base_digest[MU_DIGEST_BYTES];
 static struct mv_transport transport;
 /* usb_ep0_send fills only the first page of its transfer descriptor:
  * 256-byte alignment keeps every reply inside one 4 KiB page. */
-static uint8_t reply[256] __attribute__((aligned(256)));
+static uint8_t reply[512] __attribute__((aligned(512))); /* within one 4 KiB page */
 static struct dtd data_dtd __attribute__((aligned(32)));
 static uint8_t started, receiving;
 static volatile uint8_t wake_posted;
@@ -152,6 +152,16 @@ uint32_t modwerk_ep0_dispatch(void)
         modwerk_ep0_reply = out;
         return 68;
     }
+#ifdef MODWERK_DSP_LOADER
+    /* MISSING (0xC1, bRequest 14, wValue 0, wLength 316): the modules the project names that are not
+     * installed (dsp.c modwerk_dsp_missing_list), so the host can offer them. Read-only. */
+    if (r.action == MV_STALL && SETUP[0] == MV_RESULT_TYPE && SETUP[1] == 14 && !SETUP[2] && !SETUP[3] &&
+        SETUP[4] == MODWERK_VENDOR_INTERFACE && !SETUP[5] && (SETUP[6] | SETUP[7] << 8) == 316) {
+        unsigned modwerk_dsp_missing_list(uint8_t *);
+        modwerk_ep0_reply = out;
+        return modwerk_dsp_missing_list(out);
+    }
+#endif
 #ifdef MODWERK_DEV
     if (r.action == MV_STALL) { /* development bases: KEY and SCREEN (dev.c) */
         uint32_t modwerk_dev_request(const uint8_t *, const uint8_t **, uint8_t *);

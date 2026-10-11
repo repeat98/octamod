@@ -16,6 +16,7 @@
 //   npm run device -- report                        # its full report (dsp.c modwerk_dsp_report, version 9: 63 words; miss0-2 the first refused packet (dsp_receiver.asm))
 //   npm run device -- probe 0|1                     # one no-op loader packet to a DSP core
 //   npm run device -- meter 0|1                     # the DSP load meter's last 1024-frame window (core 0's idle iterations)
+//   npm run device -- missing                       # the modules the project names that are not installed (MISSING request)
 //   npm run device -- enc A+3 | LEVEL-1 | fader 128 # encoders A-F and LEVEL, the crossfader
 //
 // --emulator drives ot_emu's USB bench socket instead (it enumerates the device
@@ -41,10 +42,10 @@ const { values, positionals: [command, file] } = parseArgs({ allowPositionals: t
   png: { type: 'string' },
 } })
 const seconds = Number(values.seconds)
-if (!['status', 'try', 'remove', 'lifecycle', 'boot', 'key', 'screen', 'state', 'enc', 'fader', 'loader', 'report', 'probe', 'meter'].includes(command) || (['try', 'boot', 'key', 'enc', 'fader', 'probe', 'meter'].includes(command) && !file) ||
-  (['status', 'lifecycle', 'screen', 'state', 'loader', 'report'].includes(command) && file) ||
+if (!['status', 'try', 'remove', 'lifecycle', 'boot', 'key', 'screen', 'state', 'enc', 'fader', 'loader', 'report', 'probe', 'meter', 'missing'].includes(command) || (['try', 'boot', 'key', 'enc', 'fader', 'probe', 'meter'].includes(command) && !file) ||
+  (['status', 'lifecycle', 'screen', 'state', 'loader', 'report', 'missing'].includes(command) && file) ||
   !Number.isInteger(seconds) || seconds < 1 || seconds > 3600) {
-  console.error('Usage: device.mjs status | try MODULE.mwrm [--seconds 1-3600] [--accept] | remove [MODULE.mwrm] [--accept] | lifecycle | boot BUILD_DIR | key NAME[+NAME] | screen | state | loader | report | probe 0|1 | meter 0|1 | enc A+3 | fader 0-255 [--socket PATH] [--emulator]')
+  console.error('Usage: device.mjs status | try MODULE.mwrm [--seconds 1-3600] [--accept] | remove [MODULE.mwrm] [--accept] | lifecycle | boot BUILD_DIR | key NAME[+NAME] | screen | state | loader | report | probe 0|1 | meter 0|1 | missing | enc A+3 | fader 0-255 [--socket PATH] [--emulator]')
   process.exit(2)
 }
 
@@ -170,6 +171,16 @@ try {
     const hex = new Set(['hostFlags', 'manager', 'used', 'dry', 'intcIprl', 'intcImrl', 'eportPinFlagSelect', 'edmaIntErr', 'csr0csr1', 'edmaEs', 'edmaEsSeen', 'missCheck', 'miss0', 'miss1', 'miss2'])
     console.log(Object.fromEntries(names.map((name, i) => [name, ['job0', 'job1', 'missCore', 'meterCore'].includes(name) ? view.getInt32(4 * i)
       : hex.has(name) ? '0x' + view.getUint32(4 * i).toString(16) : view.getUint32(4 * i)])))
+    process.exit(0)
+  }
+  if (command === 'missing') { // MISSING (ep0.c, dsp.c): "MWM", a count, then 24 bytes a handle
+    const reply = await unit.controlTransferIn({ requestType: 'vendor', recipient: 'interface', request: 14, value: 0, index }, 316)
+    if (reply.status !== 'ok' || !reply.data) throw new Error('This base does not answer MISSING: build it with --dsp-loader.')
+    const bytes = new Uint8Array(reply.data.buffer, reply.data.byteOffset, reply.data.byteLength), view = new DataView(reply.data.buffer, reply.data.byteOffset, reply.data.byteLength)
+    const n = bytes[3], text = (at, length) => String.fromCharCode(...bytes.subarray(at, at + length)).replace(/\0.*$/, '')
+    if (text(0, 3) !== 'MWM' || bytes.byteLength !== 4 + 24 * n) throw new Error('Not a MISSING reply.')
+    console.log(n ? Array.from({ length: n }, (_, i) => ({ handle: bytes[4 + 24 * i], layout: view.getUint16(6 + 24 * i),
+      module: view.getUint32(8 + 24 * i).toString(16).padStart(8, '0'), name: text(12 + 24 * i, 16) })) : 'nothing missing')
     process.exit(0)
   }
   if (command === 'meter') { // dsp_receiver.asm's load meter, read back a bit a frame (63 report words, version 9)

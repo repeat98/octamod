@@ -94,6 +94,16 @@ void modwerk_fxmap_name(unsigned id, char *out)
         if (modwerk_fx_legacy[i].id == id) for (unsigned c = 0; c < 16u; ++c) out[c] = modwerk_fx_legacy[i].name[c];
     out[15] = 0;
 }
+/* The module behind handle `id`: the map's entry, else today's catalogue assignment; 0 when neither names one. */
+int modwerk_fxmap_describe(unsigned id, uint32_t *module, uint16_t *layout, char *name)
+{
+    *module = 0, *layout = 0;
+    modwerk_fxmap_name(id, name);
+    if (id >= 32u) return 0;
+    if (valid() && MAP->e[id].module) *module = MAP->e[id].module, *layout = MAP->e[id].layout;
+    else for (unsigned i = 0; i < modwerk_fx_legacy_count; ++i) if (modwerk_fx_legacy[i].id == id) *module = modwerk_fx_legacy[i].module;
+    return *module != 0;
+}
 /* A module took handle `id` (dsp.c, at its switch): the map names it there. */
 void modwerk_fxmap_assign(unsigned id, uint32_t module, unsigned layout, const char *name)
 {
